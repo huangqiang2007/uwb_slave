@@ -1,11 +1,10 @@
 #include "em_usart.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
+#include "spidrv.h"
 #include <stdbool.h>
 
 #define SPI_CLK 200000
-
-USART_TypeDef *usart_spi = USART1;
 
 /*
  * @brief
@@ -14,6 +13,8 @@ USART_TypeDef *usart_spi = USART1;
 void SPIConfig(void)
 {
 	USART_InitSync_TypeDef SPI_init = USART_INITSYNC_DEFAULT;
+
+	usart_spi = USART1;
 
 	CMU_ClockEnable(cmuClock_HFPER, true);
 	CMU_ClockEnable(cmuClock_GPIO, true);

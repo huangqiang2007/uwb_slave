@@ -5,9 +5,9 @@
 
 
 /*
- * represent 50 * 10ms = 500ms timeout
+ * represent 100 * 10ms = 1s timeout
  * */
-#define CMD_FEEDBACK_TIMEOUT 50
+#define CMD_FEEDBACK_TIMEOUT 100
 volatile uint32_t g_cmd_feedback_timeout; /* the count of 10ms unit */
 
 /*
