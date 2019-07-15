@@ -3,6 +3,8 @@
 #ifndef INLCUDE_MAINCTRL_H_
 #define INLCUDE_MAINCTRL_H_
 
+#define SLAVE_NUMS 4
+
 /*
  * slave waken up flag
  * */
@@ -53,8 +55,6 @@ struct MainCtrlFrame {
 	uint8_t crc1; // crc[15:8]
 };
 
-struct MainCtrlFrame g_mainCtrlFr;
-
 struct BackTokenFrame {
 	uint8_t head0; //0x55
 	uint8_t head1; //0xaa
@@ -62,13 +62,31 @@ struct BackTokenFrame {
 	uint8_t serial; // serial num: 0-255
 	uint8_t frameCtrl;
 	uint8_t frameType;
-	uint8_t data[5];
+	uint8_t data[FRAME_DATA_LEN];
 	uint8_t crc0; // crc[7:0]
 	uint8_t crc1; // crc[15:8]
 };
 
+/*
+ * data frame to control computer
+ * */
+struct RS422DataFrame {
+	uint8_t head0; //0x33
+	uint8_t head1; //0xcc
+	uint8_t len; // data packets num
+	struct MainCtrlFrame packets[SLAVE_NUMS]; // data packet
+	uint8_t crc0; // crc[7:0]
+	uint8_t crc1; // crc[15:8]
+};
+
+struct MainCtrlFrame g_mainCtrlFr;
+struct RS422DataFrame g_RS422DataFr;
 struct BackTokenFrame g_backTokenFr;
 
-extern uint16_t CalFrameCRC(struct MainCtrlFrame *mainCtrlFr);
+volatile int8_t g_slaveWkup;
+
+extern uint16_t CalFrameCRC(uint8_t data[], int len);
+extern void WakeupSlave(void);
+extern void RecvFromSlave(void);
 
 #endif
