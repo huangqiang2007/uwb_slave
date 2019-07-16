@@ -3,7 +3,13 @@
 #ifndef INLCUDE_MAINCTRL_H_
 #define INLCUDE_MAINCTRL_H_
 
-#define SLAVE_NUMS 4
+#define Q_LEN 4
+
+/*
+ * the IDs for 4 slaves
+ * [0, 1, 2, 3]
+ * */
+int8_t g_device_id;
 
 /*
  * slave waken up flag
@@ -68,25 +74,25 @@ struct BackTokenFrame {
 };
 
 /*
- * data frame to control computer
+ * the queue for storing packets coming from
+ * main control node and manual node.
  * */
-struct RS422DataFrame {
-	uint8_t head0; //0x33
-	uint8_t head1; //0xcc
-	uint8_t len; // data packets num
-	struct MainCtrlFrame packets[SLAVE_NUMS]; // data packet
-	uint8_t crc0; // crc[7:0]
-	uint8_t crc1; // crc[15:8]
+struct ReceivedPacketQueue {
+	volatile int8_t len; // data packets num
+	int8_t p_in, p_out;
+	struct MainCtrlFrame packets[Q_LEN]; // data packet
 };
 
 struct MainCtrlFrame g_mainCtrlFr;
-struct RS422DataFrame g_RS422DataFr;
-struct BackTokenFrame g_backTokenFr;
+struct ReceivedPacketQueue g_ReceivedPacketQueue;
 
-volatile int8_t g_slaveWkup;
+/*
+ * true: received new cmd
+ * false: received no cmd
+ * */
+bool g_received_cmd;
 
+extern void global_init(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
-extern void WakeupSlave(void);
-extern void RecvFromSlave(void);
-
+extern int ParsePacket(void);
 #endif

@@ -15,7 +15,6 @@
 #define MAX_MS    20    //65535 / MS_COUNT
 
 volatile bool Timer1_overflow;
-volatile uint32_t g_Ticks = 0;
 /**************************************************************************//**
  * @brief TIMER0_IRQHandler
  * Interrupt Service Routine TIMER0 Interrupt Line
@@ -26,7 +25,7 @@ void TIMER0_IRQHandler(void)
 	/* Clear flag for TIMER0 overflow interrupt */
 	TIMER_IntClear(TIMER0, TIMER_IF_OF);
 	g_Ticks++;
-	if (g_Ticks > 0xFFFFFFF0 - WAKUP_DURATION)
+	if (g_Ticks > 0xFFFFFFF0 - IDLE_CMD_TIMEOUT)
 		g_Ticks = 0;
 }
 
@@ -109,6 +108,14 @@ void setupTimer1(void)
 
 	/* Configure TIMER */
 	TIMER_Init(TIMER1, &timerInit);
+}
+
+void timer_init(void)
+{
+	g_Ticks = 0;
+
+	setupTimer0();
+	setupTimer1();
 }
 
 void Delay_us(uint32_t us)

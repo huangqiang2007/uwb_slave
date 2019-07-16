@@ -4,12 +4,18 @@
 #include "timer.h"
 #include "uartdrv.h"
 #include "mainctrl.h"
+#include "em_core.h"
 #include <stdbool.h>
 #include <string.h>
 
 volatile uint8_t g_slaveStatus = 0;
 
-extern volatile uint32_t g_Ticks;
+void global_init(void)
+{
+	g_device_id = 0;
+	g_received_cmd = false;
+	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
+}
 
 /*
  * all 5 bytes data add each other and get the 16bits sum.
@@ -43,120 +49,139 @@ void InitFrame(struct MainCtrlFrame *mainCtrlFr, uint8_t src, uint8_t slave,
 	mainCtrlFr->crc1 = (data_crc >> 8) & 0xff;
 }
 
-/*
- * send a frame to slave and poll the corresponding back token.
- * @src: frame source, main node, manual node or slave node
- * @slave: talk to which slave node
- * @type£º frame type
- *
- * @ret: -1: talk timeout; 0: talk successfully.
- * */
-uint8_t TalktoSlave(uint8_t src, uint8_t slave, uint8_t type, uint8_t data[])
+bool queue_full(struct ReceivedPacketQueue *frameQueue)
 {
-	int8_t ret = -1;
-
-	InitFrame(&g_mainCtrlFr, src, slave, type, data);
-
-	/*
-	 * reset command timeout
-	 * */
-	g_cmd_feedback_timeout = g_Ticks + CMD_FEEDBACK_TIMEOUT;
-
-	/*
-	 * to do:  wireless send logic
-	 * */
-
-	while (g_Ticks < g_cmd_feedback_timeout) {
-
-	}
-
-	return ret;
+	if (frameQueue->len == Q_LEN)
+		return true;
+	else
+		return false;
 }
 
-/*
- * try to wake up all slave, woken slaves are marked in 'g_slaveStatus' var.
- * */
-void WakeupSlave(void)
+bool queue_empty(struct ReceivedPacketQueue *frameQueue)
 {
-	int i = 0, ret = -1;
-	uint8_t fr_data[FRAME_DATA_LEN];
+	if (frameQueue->len == 0)
+		return true;
+	else
+		return false;
+}
 
-	memset(fr_data, 0xff, FRAME_DATA_LEN);
-	g_wakup_timeout = g_Ticks + WAKUP_DURATION;
+void enqueue_frame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr)
+{
+	if (queue_full(frameQueue))
+		return;
 
-	/*
-	 * wake up duration is 10 minutes
-	 * */
-	while (g_Ticks < g_wakup_timeout) {
-		for (i = 0; i < SLAVE_NUMS; i++) {
-			ret = TalktoSlave(MAIN_NODE, i, ENUM_SAMPLE_SET, fr_data);
-			if (ret == 0)
-				g_slaveStatus |= (1 << i);
-		}
+	memcpy((uint8_t *)&(frameQueue->packets[frameQueue->p_in++]),
+		(uint8_t *)mainCtrlFr, sizeof(struct MainCtrlFrame));
 
-		/*
-		 * all slaves are waken up
-		 * */
-		if ((g_slaveStatus & SLAVE_WKUP_MSK) == SLAVE_WKUP_MSK)
+	frameQueue->len++;
+}
+
+struct MainCtrlFrame *dequeue_frame(struct ReceivedPacketQueue *frameQueue)
+{
+	struct MainCtrlFrame *pmainCtrlFrame = NULL;
+
+	if (queue_empty(frameQueue))
+		return NULL;
+
+	pmainCtrlFrame = (struct MainCtrlFrame *)&(frameQueue->packets[frameQueue->p_out++]);
+
+	CORE_CriticalDisableIrq();
+	frameQueue->len--;
+	CORE_CriticalEnableIrq();
+
+	return pmainCtrlFrame;
+}
+
+void form_sample_set_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+{
+	uint16_t data_crc;
+
+	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+
+	pMainCtrlFrame->frameType = ENUM_SAMPLE_SET_TOKEN;
+
+	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
+	pMainCtrlFrame->crc0 = data_crc & 0xff;
+	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+}
+
+void form_sample_data_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+{
+	uint16_t data_crc;
+
+	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+
+	pMainCtrlFrame->frameType = ENUM_SAMPLE_DATA_TOKEN;
+
+	pMainCtrlFrame->data[0] = 0;
+
+	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
+	pMainCtrlFrame->crc0 = data_crc & 0xff;
+	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+}
+
+void form_slave_status_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+{
+	uint16_t data_crc;
+
+	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+
+	pMainCtrlFrame->frameType = ENUM_SLAVE_STATUS_TOKEN;
+
+	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
+	pMainCtrlFrame->crc0 = data_crc & 0xff;
+	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+}
+
+void form_sleep_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+{
+	uint16_t data_crc;
+
+	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+
+	pMainCtrlFrame->frameType = ENUM_SLAVE_SLEEP_TOKEN;
+
+	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
+	pMainCtrlFrame->crc0 = data_crc & 0xff;
+	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+}
+
+int ParsePacket(void)
+{
+	struct MainCtrlFrame *pMainCtrlFrame = NULL;
+	int ret = -1;
+
+	pMainCtrlFrame = dequeue_frame(&g_ReceivedPacketQueue);
+	if (!pMainCtrlFrame)
+		return ret;
+	else
+		ret = 0;
+
+	switch (pMainCtrlFrame->frameType)
+	{
+		case ENUM_SAMPLE_SET:
+			form_sample_set_token_frame(pMainCtrlFrame);
+			break;
+
+		case ENUM_SAMPLE_DATA:
+			form_sample_data_token_frame(pMainCtrlFrame);
+			break;
+
+		case ENUM_SLAVE_STATUS:
+			form_slave_status_token_frame(pMainCtrlFrame);
+			break;
+
+		case ENUM_SLAVE_SLEEP:
+			form_sleep_token_frame(pMainCtrlFrame);
+			break;
+
+		default:
 			break;
 	}
 
-	/*
-	 * if it exists woken slaves, it can begin to fetch data from slaves.
-	 * */
-	if ((g_slaveStatus & SLAVE_WKUP_MSK) > 0)
-		g_slaveWkup = true;
-}
-
-/*
- * scan all slaves and fetch sample data.
- * */
-void RecvFromSlave(void)
-{
-	uint16_t crc_sum = 0;
-	int i = 0, ret = -1;
-	uint8_t fr_data[FRAME_DATA_LEN] = {0};
-
-	memset(&g_RS422DataFr, 0xff, sizeof(struct RS422DataFrame));
-	g_RS422DataFr.head0 = 0x33;
-	g_RS422DataFr.head1 = 0xcc;
-	g_RS422DataFr.len = 0;
-
-	/*
-	 * scan each slave and receive sameple data
-	 * */
-	for (i = 0; i < SLAVE_NUMS; i++) {
-		if ((g_slaveStatus & (1 << i)) == (1 << i)) {
-			ret = TalktoSlave(MAIN_NODE, i, ENUM_SAMPLE_DATA, fr_data);
-			if (ret == 0) {
-				crc_sum = CalFrameCRC(g_mainCtrlFr.data, FRAME_DATA_LEN);
-				if (g_mainCtrlFr.head0 != 0x55 || g_mainCtrlFr.head1 != 0xaa
-					|| g_mainCtrlFr.crc0 != (crc_sum & 0xff) || g_mainCtrlFr.crc1 != ((crc_sum >> 8) & 0xff))
-					continue;
-
-				memcpy(&g_RS422DataFr.packets[g_RS422DataFr.len], &g_mainCtrlFr, sizeof(g_mainCtrlFr));
-				g_RS422DataFr.len++;
-			} else {
-				g_slaveStatus &= ~(1 << i);
-
-				/*
-				 * if all slave is offline, reset flag 'g_slaveWkup' to begin wakeup logic.
-				 * */
-				if ((g_slaveStatus & SLAVE_WKUP_MSK) == 0)
-					g_slaveWkup = false;
-			}
-		}
-	}
-
-	/*
-	 * if it exists valid sample data coming from slaves,
-	 * calculate CRC and send them to control computer.
-	 * */
-	if (g_RS422DataFr.len > 0) {
-		crc_sum =  CalFrameCRC((uint8_t *)&g_RS422DataFr.packets[0], sizeof(struct MainCtrlFrame) * SLAVE_NUMS);
-		g_RS422DataFr.crc0 = crc_sum & 0xff;
-		g_RS422DataFr.crc1 = (crc_sum >> 8) & 0xff;
-
-		uartPutData((uint8_t *)&g_RS422DataFr.packets[0], sizeof(struct RS422DataFrame));
-	}
+	return ret;
 }

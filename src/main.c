@@ -1,7 +1,7 @@
 #include <string.h>
 #include "em_device.h"
 #include "em_chip.h"
-#include "em_cmu.h"
+#include "em_emu.h"
 #include "em_adc.h"
 #include "em_cmu.h"
 #include "timer.h"
@@ -10,9 +10,9 @@
 #include "main.h"
 #include "mainctrl.h"
 #include "uartdrv.h"
+#include "spidrv.h"
 #include "Typedefs.h"
 
-extern volatile int8_t g_slaveWkup;
 
 void Clock_config(void)
 {
@@ -42,8 +42,6 @@ void Clock_config(void)
 
 int main(void)
 {
-	g_slaveWkup = false;
-
 	/* Chip errata */
 	CHIP_Init();
 
@@ -72,16 +70,27 @@ int main(void)
 	 * DW100 wireless device init, to do.
 	 * */
 
+	/*
+	 * config timer0 and timer1
+	 * */
+	timer_init();
+
+	/*
+	 * some global configuration
+	 * */
+	global_init();
+
   	UDELAY_Calibrate();
   	Delay_ms(500);
 
 	while (1) {
-		if (!g_slaveWkup)
-			WakeupSlave();
-		else
-			RecvFromSlave();
-
-		Delay_ms(2);
+		if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)
+			EMU_EnterEM1();
+		else if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
+			EMU_EnterEM1();
+		else {
+			ParsePacket();
+		}
 	}
 }
 
