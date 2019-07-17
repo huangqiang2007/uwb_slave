@@ -19,20 +19,7 @@
  * */
 #define ADC_IGNORE_CNT 5
 
-AdcSampleDataQueueDef adcSampleDataQueue = {0};
 DMA_CB_TypeDef dma_adc_cb;
-uint8_t g_sampleResultBuffer[ADC_SCAN_LOOPS * ADC_CHNL_NUM];
-uint8_t g_convResult[ADC_CHNL_NUM] = {0};
-
-/*
- * frame number
- * */
-volatile uint8_t g_frameNum = 0;
-
-/*
- * RS422 data frame
- * */
-UartFrame g_RS422frame = {0};
 
 /*
  * @brief
@@ -59,54 +46,11 @@ void ADCConfig(void)
 	scanInit.rep = true;
 	scanInit.reference = adcRef2V5;
 	scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
-	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH0 | ADC_SCANCTRL_INPUTMASK_CH1 | ADC_SCANCTRL_INPUTMASK_CH2 |
-					   ADC_SCANCTRL_INPUTMASK_CH3 | ADC_SCANCTRL_INPUTMASK_CH4 | ADC_SCANCTRL_INPUTMASK_CH5 |
-					   ADC_SCANCTRL_INPUTMASK_CH6;
+	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH0 | ADC_SCANCTRL_INPUTMASK_CH1
+					| ADC_SCANCTRL_INPUTMASK_CH2 | ADC_SCANCTRL_INPUTMASK_CH3;
 	ADC_InitScan(ADC0, &scanInit);
-}
 
-static inline bool sampleQueueEmpty(AdcSampleDataQueueDef *queue)
-{
-	if (queue->samples == 0)
-		return true;
-	else
-		return false;
-}
-
-static inline bool sampleQueueFull(AdcSampleDataQueueDef *queue)
-{
-	if (queue->samples == ADC_SAMPLE_BUFFER_NUM)
-		return true;
-	else
-		return false;
-}
-
-static ADC_SAMPLE_BUFFERDef* DMA_getFreeSampleBuffer(void)
-{
-	ADC_SAMPLE_BUFFERDef *pbuff = NULL;
-
-	if (!sampleQueueFull(&adcSampleDataQueue)) {
-		pbuff = &adcSampleDataQueue.adc_smaple_data[adcSampleDataQueue.in];
-		adcSampleDataQueue.in++;
-		if (adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM - 1)
-			adcSampleDataQueue.in = 0;
-	}
-
-	return pbuff;
-}
-
-static ADC_SAMPLE_BUFFERDef* DMA_getValidBuffer(void)
-{
-	ADC_SAMPLE_BUFFERDef *pbuff = NULL;
-
-	if (!sampleQueueEmpty(&adcSampleDataQueue)) {
-		pbuff = &adcSampleDataQueue.adc_smaple_data[adcSampleDataQueue.out];
-		adcSampleDataQueue.out++;
-		if (adcSampleDataQueue.out == ADC_SAMPLE_BUFFER_NUM - 1)
-			adcSampleDataQueue.out = 0;
-	}
-
-	return pbuff;
+	memset((void *)&g_adcSampleDataQueue, 0x00, sizeof(g_adcSampleDataQueue));
 }
 
 void DMA_ADC_callback(unsigned int channel, bool primary, void *user)
@@ -120,19 +64,24 @@ void DMA_ADC_callback(unsigned int channel, bool primary, void *user)
 	 * */
 	if (drop_cnt < ADC_IGNORE_CNT) {
 		drop_cnt++;
-		return;
+		goto out;
 	}
 
-	pSampleBuff = DMA_getFreeSampleBuffer();
-	if (!pSampleBuff)
-		return;
+	g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
+	g_adcSampleDataQueue.in++;
+	if (g_adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM)
+		g_adcSampleDataQueue.in = 0;
 
-	memcpy(pSampleBuff->adc_sample_buffer, g_sampleResultBuffer, ADC_SCAN_LOOPS * ADC_CHNL_NUM);
+out:
+	/* Re-activate the DMA */
+	DMA_RefreshPingPong(channel,
+						primary,
+						false,
+						(void *)&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in],
+						(void *)&(ADC0->SCANDATA),
+						ADC_CHNL_NUM - 1,
+						false);
 
-	/*
-	 * update sample counter
-	 * */
-	adcSampleDataQueue.samples++;
 }
 
 /*
@@ -158,7 +107,7 @@ void DMAConfig(void)
 	* Configure DMA channel used
 	* */
 	dma_adc_cb.cbFunc = DMA_ADC_callback;
-	dma_adc_cb.userPtr = (void *)&adcSampleDataQueue;
+	dma_adc_cb.userPtr = (void *)&g_adcSampleDataQueue;
 
 	chnlCfg.highPri = false;
 	chnlCfg.enableInt = true;
@@ -175,108 +124,27 @@ void DMAConfig(void)
 	descrCfg.arbRate = dmaArbitrate1;
 	descrCfg.hprot = 0;
 	DMA_CfgDescr(DMA_CHANNEL, true, &descrCfg);
+	DMA_CfgDescr(DMA_CHANNEL, false, &descrCfg);
+
+	// Start DMA
+	DMA_ActivatePingPong(
+		DMA_CHANNEL,
+		false,
+		(void *)&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in], // primary destination
+		(void *)&(ADC0->SCANDATA), // primary source
+		ADC_CHNL_NUM - 1,
+		(void *)&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in], // alternate destination
+		(void *)&(ADC0->SCANDATA), // alternate source
+		ADC_CHNL_NUM - 1);
 }
 
-void DMA_ADC_Start(void)
+void ADCStart(void)
 {
-	DMA_ActivateBasic(DMA_CHANNEL, true, false, (void *)g_sampleResultBuffer,
-		(void *)&(ADC0->SCANDATA), ADC_SCAN_LOOPS * ADC_CHNL_NUM - 1);
+	ADCConfig();
+	DMAConfig();
 
 	/*
 	 * Start Scan
 	 * */
 	ADC_Start(ADC0, adcStartScan);
-}
-
-int getAverageSampleValue(void)
-{
-	ADC_SAMPLE_BUFFERDef *pSampleBuff = NULL;
-	int i = 0;
-	uint32_t sumSampleValue[ADC_CHNL_NUM] = {0};
-
-	pSampleBuff = DMA_getValidBuffer();
-	if (!pSampleBuff)
-		return -1;
-
-	for (i = 0; i < ADC_SCAN_LOOPS; i += 7) {
-		sumSampleValue[0] += pSampleBuff->adc_sample_buffer[i];
-		sumSampleValue[1] += pSampleBuff->adc_sample_buffer[i + 1];
-		sumSampleValue[2] += pSampleBuff->adc_sample_buffer[i + 2];
-		sumSampleValue[3] += pSampleBuff->adc_sample_buffer[i + 3];
-		sumSampleValue[4] += pSampleBuff->adc_sample_buffer[i + 4];
-		sumSampleValue[5] += pSampleBuff->adc_sample_buffer[i + 5];
-		sumSampleValue[6] += pSampleBuff->adc_sample_buffer[i + 6];
-	}
-
-	/*
-	 * update sample counter to return the buffer to queue,
-	 * disable interrupt to avoid race condition.
-	 * */
-	CORE_CriticalDisableIrq();
-	adcSampleDataQueue.samples--;
-	CORE_CriticalEnableIrq();
-
-	for (i = 0; i < ADC_CHNL_NUM; i++)
-		g_convResult[i] = sumSampleValue[i] / ADC_SCAN_LOOPS;
-
-	return 0;
-}
-
-/*
- * frame format:
- *
- * byte[0]: 0x55
- * byte[1]: 0xAA
- * byte[2]: 0x08
- * byte[3-9]: ADC_ch0 - ADC_ch6
- * byte[10]: frame NO.
- * byte[11]: crc
- * */
-void collectFrame(void)
-{
-	int i = 0;
-	int sum = 0;
-
-	if (getAverageSampleValue() < 0)
-		return;
-
-	g_RS422frame.uartFrame[0] = 0x55;
-	g_RS422frame.uartFrame[1] = 0xAA;
-	g_RS422frame.uartFrame[2] = 8;
-
-	for (i = 3; i <= 9; i++)
-		g_RS422frame.uartFrame[i] = g_convResult[i - 3];
-
-	g_RS422frame.uartFrame[10] = (++g_frameNum) & 0xFF;
-
-	for (i = 2; i <= 10; i++)
-		sum += g_RS422frame.uartFrame[i];
-
-	g_RS422frame.uartFrame[11] = sum & 0xFF;
-
-	if (UartFrameEnqueue(&g_RS422frame) < 0) {
-		/*
-		 * if the queue is full, free some space for new frame.
-		 * */
-		sendFrame();
-
-		/*
-		 * enqueue again
-		 * */
-		UartFrameEnqueue(&g_RS422frame);
-	}
-}
-
-/*
- * store frame to UART buffer and prepare for sending
- * */
-void sendFrame(void)
-{
-	UartFrame *uFrame = NULL;
-
-	uFrame = UartFrameDequeue();
-	if (!uFrame)
-		return;
-
-	uartPutData(uFrame->uartFrame, UARTFRAME_LEN_12B);
 }

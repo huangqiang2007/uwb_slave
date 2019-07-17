@@ -61,10 +61,9 @@ int main(void)
 	SPIConfig();
 
 	/*
-	 * config one DMA channel for transferring ADC sample results
-	 * to specific RAM buffer.
+	 * config and start ADC via DMA
 	 * */
-	//DMAConfig();
+	ADCStart();
 
 	/*
 	 * DW100 wireless device init, to do.
@@ -75,13 +74,18 @@ int main(void)
 	 * */
 	timer_init();
 
+	UDELAY_Calibrate();
+	Delay_ms(500);
+
+	/*
+	 * init RTC for LFRCO 32.768KHz
+	 * */
+	RtcSetup();
+
 	/*
 	 * some global configuration
 	 * */
 	global_init();
-
-  	UDELAY_Calibrate();
-  	Delay_ms(500);
 
 	while (1) {
 		if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)

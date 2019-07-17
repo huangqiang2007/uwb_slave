@@ -3,10 +3,8 @@
 
 #include "main.h"
 
-#define ADC_CHNL_NUM 7
-#define ADC_SCAN_LOOPS 100
-
-#define ADC_SAMPLE_BUFFER_NUM 4
+#define ADC_CHNL_NUM 1
+#define ADC_SAMPLE_BUFFER_NUM 10
 
 /*
  * one ADC sample buffer, the total buffer size 100 * 7 bytes
@@ -15,7 +13,7 @@
  * @adc_sample_buffer: the array stores the sampled data
  * */
 typedef struct {
-	uint8_t adc_sample_buffer[ADC_SCAN_LOOPS * ADC_CHNL_NUM];
+	uint8_t adc_sample_buffer[ADC_CHNL_NUM];
 } ADC_SAMPLE_BUFFERDef;
 
 /*
@@ -32,10 +30,8 @@ typedef struct {
 	volatile ADC_SAMPLE_BUFFERDef adc_smaple_data[ADC_SAMPLE_BUFFER_NUM];
 } AdcSampleDataQueueDef;
 
-extern void ADCConfig(void);
-extern void DMAConfig(void);
-extern void DMA_ADC_Start(void);
-extern void collectFrame(void);
-extern void sendFrame(void);
+AdcSampleDataQueueDef g_adcSampleDataQueue;
+
+extern void ADCStart(void);
 
 #endif /* ADCDRV_H_ */

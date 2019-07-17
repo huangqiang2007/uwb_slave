@@ -37,17 +37,17 @@ void initGPIO(void)
 	//GPIO_PinModeSet(BSP_GPIO_LED0_PORT, BSP_GPIO_LED0_PIN, gpioModePushPull, 0);
 }
 
-/**************************************************************************//**
- * @brief RTCC initialization
- *****************************************************************************/
-void rtcSetup(void)
+/*
+ * RTC config for using LFRCO
+ * */
+void RtcSetup(void)
 {
 	// Enable the oscillator for the RTC
-	CMU_OscillatorEnable(cmuOsc_LFXO, true, true);
+	CMU_OscillatorEnable(cmuOsc_LFRCO, true, true);
 
 	// Turn on the clock for Low Energy clocks
 	CMU_ClockEnable(cmuClock_HFLE, true);
-	CMU_ClockSelectSet(cmuClock_LFA, cmuSelect_LFXO);
+	CMU_ClockSelectSet(cmuClock_LFA, cmuSelect_LFRCO);
 
 	// Turn on the RTC clock
 	CMU_ClockEnable(cmuClock_RTC, true);

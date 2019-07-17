@@ -1,3 +1,5 @@
+#include <stdbool.h>
+#include <string.h>
 #include "em_usart.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
@@ -5,8 +7,7 @@
 #include "uartdrv.h"
 #include "mainctrl.h"
 #include "em_core.h"
-#include <stdbool.h>
-#include <string.h>
+#include "adcdrv.h"
 
 volatile uint8_t g_slaveStatus = 0;
 
@@ -118,7 +119,7 @@ void form_sample_data_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 	/*
 	 * to do
 	 * */
-	pMainCtrlFrame->data[0] = 0;
+	pMainCtrlFrame->data[0] = g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.out].adc_sample_buffer[0];
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
