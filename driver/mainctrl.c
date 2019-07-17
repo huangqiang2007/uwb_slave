@@ -96,8 +96,8 @@ void form_sample_set_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
-	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
-	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+	//pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	//pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
 
 	pMainCtrlFrame->frameType = ENUM_SAMPLE_SET_TOKEN;
 
@@ -110,11 +110,14 @@ void form_sample_data_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
-	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
-	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+	//pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	//pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
 
 	pMainCtrlFrame->frameType = ENUM_SAMPLE_DATA_TOKEN;
 
+	/*
+	 * to do
+	 * */
 	pMainCtrlFrame->data[0] = 0;
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
@@ -126,8 +129,8 @@ void form_slave_status_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
-	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
-	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+	//pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	//pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
 
 	pMainCtrlFrame->frameType = ENUM_SLAVE_STATUS_TOKEN;
 
@@ -140,8 +143,8 @@ void form_sleep_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
-	pMainCtrlFrame->frameCtrl &= ~(3 << 6);
-	pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
+	//pMainCtrlFrame->frameCtrl &= ~(3 << 6);
+	//pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
 
 	pMainCtrlFrame->frameType = ENUM_SLAVE_SLEEP_TOKEN;
 

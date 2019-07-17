@@ -175,9 +175,6 @@ void DMAConfig(void)
 	descrCfg.arbRate = dmaArbitrate1;
 	descrCfg.hprot = 0;
 	DMA_CfgDescr(DMA_CHANNEL, true, &descrCfg);
-
-	NVIC_ClearPendingIRQ(DMA_IRQn);
-	NVIC_EnableIRQ(DMA_IRQn);
 }
 
 void DMA_ADC_Start(void)

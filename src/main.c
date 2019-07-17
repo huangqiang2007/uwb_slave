@@ -85,9 +85,9 @@ int main(void)
 
 	while (1) {
 		if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)
-			EMU_EnterEM1();
+			EMU_EnterEM2(true);
 		else if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
-			EMU_EnterEM1();
+			EMU_EnterEM2(true);
 		else {
 			ParsePacket();
 		}
