@@ -9,11 +9,16 @@
 #include "em_core.h"
 #include "adcdrv.h"
 
+/*
+ * slave device ID 0x0 - 0x3 *
+ * */
+int8_t SLAVE_ID = 0x0;
+
 volatile uint8_t g_slaveStatus = 0;
 
 void global_init(void)
 {
-	g_device_id = 0;
+	g_device_id = SLAVE_ID;
 	g_received_cmd = false;
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
 }

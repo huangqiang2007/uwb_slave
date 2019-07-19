@@ -46,6 +46,10 @@ void ADCConfig(void)
 	scanInit.rep = true;
 	scanInit.reference = adcRef2V5;
 	scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
+
+	/*
+	 * to do?
+	 * */
 	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH0 | ADC_SCANCTRL_INPUTMASK_CH1
 					| ADC_SCANCTRL_INPUTMASK_CH2 | ADC_SCANCTRL_INPUTMASK_CH3;
 	ADC_InitScan(ADC0, &scanInit);

@@ -4,13 +4,11 @@
 #include "spidrv.h"
 #include <stdbool.h>
 
-#define SPI_CLK 200000
-
 /*
  * @brief
  *   Configure SPI master
  * */
-void SPIConfig(void)
+void SPIConfig(uint32_t spiclk)
 {
 	USART_InitSync_TypeDef SPI_init = USART_INITSYNC_DEFAULT;
 
@@ -20,7 +18,7 @@ void SPIConfig(void)
 	CMU_ClockEnable(cmuClock_GPIO, true);
 	CMU_ClockEnable(cmuClock_USART1, true);
 
-	SPI_init.baudrate = SPI_CLK;
+	SPI_init.baudrate = spiclk;
 	USART_InitSync(usart_spi, &SPI_init);
 
 	GPIO_PinModeSet(gpioPortC, 0, gpioModePushPull, 1); //tx

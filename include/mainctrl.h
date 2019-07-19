@@ -1,7 +1,8 @@
-#include <stdint.h>
-#include <stdlib.h>
 #ifndef INLCUDE_MAINCTRL_H_
 #define INLCUDE_MAINCTRL_H_
+
+#include <stdint.h>
+#include <stdlib.h>
 
 #define Q_LEN 4
 
@@ -83,7 +84,7 @@ struct ReceivedPacketQueue {
 	struct MainCtrlFrame packets[Q_LEN]; // data packet
 };
 
-struct MainCtrlFrame g_mainCtrlFr;
+struct MainCtrlFrame g_mainCtrlFr, g_recvSlaveFr;
 struct ReceivedPacketQueue g_ReceivedPacketQueue;
 
 /*
@@ -92,7 +93,11 @@ struct ReceivedPacketQueue g_ReceivedPacketQueue;
  * */
 bool g_received_cmd;
 
+bool g_dataRecvDone;
+
 extern void global_init(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
 extern int ParsePacket(void);
+extern void enqueue_frame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr);
+
 #endif

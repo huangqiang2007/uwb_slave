@@ -1,6 +1,6 @@
-#ifndef INLCUDE_TIMER_H_
-#define INLCUDE_TIMER_H_
+#ifndef INLCUDE_RTC_H_
+#define INLCUDE_RTC_H_
 
-void RtcSetup(void);
+extern void RtcSetup(void);
 
 #endif

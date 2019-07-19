@@ -1,7 +1,8 @@
-#include <stdint.h>
-#include <stdlib.h>
 #ifndef INLCUDE_TIMER_H_
 #define INLCUDE_TIMER_H_
+
+#include <stdint.h>
+#include <stdlib.h>
 
 volatile uint32_t g_Ticks;
 
@@ -24,10 +25,10 @@ volatile uint32_t g_idle_wkup_timeout;
 #define IDLE_CMD_TIMEOUT 30000
 volatile uint32_t g_idle_cmd_timeout;
 
-void setupTimer0(void);
-void setupTimer1(void);
-void Delay_ms(uint32_t ms);
-void Delay_us(uint32_t us);
-void timer_init(void);
+extern void setupTimer0(void);
+extern void setupTimer1(void);
+extern void Delay_us(uint32_t us);
+extern void timer_init(void);
+extern void Delay_ms(uint32_t ms);
 
 #endif /* INLCUDE_TIMER_H_ */

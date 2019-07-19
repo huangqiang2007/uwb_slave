@@ -11,8 +11,9 @@
 #include "mainctrl.h"
 #include "uartdrv.h"
 #include "spidrv.h"
+#include "adcdrv.h"
+#include "rtcdrv.h"
 #include "Typedefs.h"
-
 
 void Clock_config(void)
 {
@@ -58,7 +59,7 @@ int main(void)
 	/*
 	 * SPI master config
 	 * */
-	SPIConfig();
+	SPIConfig(SPI_CLK);
 
 	/*
 	 * config and start ADC via DMA
@@ -68,6 +69,7 @@ int main(void)
 	/*
 	 * DW100 wireless device init, to do.
 	 * */
+	dwDeviceInit();
 
 	/*
 	 * config timer0 and timer1
