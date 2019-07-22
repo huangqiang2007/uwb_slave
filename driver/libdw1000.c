@@ -20,7 +20,8 @@
 
 #include <string.h>
 #include <math.h>
-
+#include "em_cmu.h"
+#include "em_gpio.h"
 #include "time.h"
 #include "spidrv.h"
 #include "mainctrl.h"
@@ -106,7 +107,7 @@ void* dwGetUserdata(dwDevice_t* dev)
 int dwConfigure(dwDevice_t* dev)
 {
 	dwEnableClock(dev, dwClockAuto); //set dw1000 digital clocking block
-	delayms(5);
+	Delay_ms(5);
 
 	dwSoftReset(dev);   //SPI soft reset dw1000 chip
 
@@ -124,11 +125,11 @@ int dwConfigure(dwDevice_t* dev)
 	dwWriteSystemEventMaskRegister(dev);
 	// load LDE micro-code
 	dwEnableClock(dev, dwClockXti);
-	delayms(5);
+	Delay_ms(5);
 	dwManageLDE(dev);
-	delayms(5);
+	Delay_ms(5);
 	dwEnableClock(dev, dwClockPll);
-	delayms(5);
+	Delay_ms(5);
 
    // //Enable LED clock
    // dwSpiWrite32(dev, PMSC, PMSC_CTRL0_SUB, dwSpiRead32(dev, PMSC, PMSC_CTRL0_SUB) | 0x008C0000);
@@ -139,7 +140,7 @@ int dwConfigure(dwDevice_t* dev)
    //
    // // Start the pll
    //
-   // delayms(1);
+   // Delay_ms(1);
 
     return DW_ERROR_OK;
 }
@@ -166,7 +167,7 @@ void dwManageLDE(dwDevice_t* dev) {
 	otpctrl[1] = 0x80;
 	dwSpiWrite(dev, PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
 	dwSpiWrite(dev, OTP_IF, OTP_CTRL_SUB, otpctrl, LEN_OTP_CTRL);
-	delayms(5);
+	Delay_ms(5);
 	pmscctrl0[0] = 0x00;
 	pmscctrl0[1] = 0x02;
 	dwSpiWrite(dev, PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
@@ -235,7 +236,7 @@ void dwSoftReset(dwDevice_t* dev)
   dwSpiWrite(dev, PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
   pmscctrl0[3] = 0x00;
   dwSpiWrite(dev, PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
-  delayms(10);
+  Delay_ms(10);
   pmscctrl0[0] = 0x00;
   pmscctrl0[3] = 0xF0;
   dwSpiWrite(dev, PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
@@ -1487,16 +1488,37 @@ void dwSetAckAndRespTime(dwDevice_t *dev, uint32_t ack_time_us, uint32_t resp_ti
 	dwSpiWrite32(dev, ACK_RESP_T, ACK_RESP_T_SUB, ack_resp_tbuf);
 }
 
-void delayms(uint32_t msecs)
+/*
+ * GPIO odd irq handler
+ * */
+void GPIO_ODD_IRQHandler(void)
 {
-	Delay_ms(msecs);
+	// Clear all odd pin interrupt flags
+	GPIO_IntClear(0xAAAA);
+
+	dwHandleInterrupt(&g_dwDev);
+}
+
+#define  gpioPortB_11 11
+void dwGpioInterruptConfig(dwDevice_t *dev)
+{
+	CMU_ClockEnable(cmuClock_GPIO, true);
+	GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 1);
+	NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
+	NVIC_EnableIRQ(GPIO_ODD_IRQn);
+	GPIO_ExtIntConfig(gpioPortB, gpioPortB_11, gpioPortB_11, false, true, true);
 }
 
 /*
  * init dw1000 wireless module
  * */
-void dwDeviceInit(dwDevice_t* dev)
+void dwDeviceInit(dwDevice_t *dev)
 {
+	/*
+	 * setup GPIO interrupt for DW1000 device
+	 * */
+	dwGpioInterruptConfig(dev);
+
 	dwInit(dev);
 	dwConfigure(dev);
 	dwSetSubNodeConfig(dev);

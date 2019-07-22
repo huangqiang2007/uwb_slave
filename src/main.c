@@ -14,6 +14,7 @@
 #include "adcdrv.h"
 #include "rtcdrv.h"
 #include "Typedefs.h"
+#include "libdw1000.h"
 
 void Clock_config(void)
 {
@@ -69,7 +70,7 @@ int main(void)
 	/*
 	 * DW100 wireless device init, to do.
 	 * */
-	dwDeviceInit();
+	dwDeviceInit(&g_dwDev);
 
 	/*
 	 * config timer0 and timer1
