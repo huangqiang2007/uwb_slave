@@ -29,6 +29,9 @@
 
 dwDevice_t g_dwDev;
 
+enum {PAN_ID1 = 0x0001, PAN_ID2};
+enum {SLAVE_ADDR1 = 0x0001, SLAVE_ADDR2, SLAVE_ADDR3, SLAVE_ADDR4};
+
 // Default Mode of operation
 extern const uint8_t MODE_LONGDATA_RANGE_LOWPOWER[];
 extern const uint8_t MODE_SHORTDATA_FAST_LOWPOWER[];
@@ -42,7 +45,7 @@ extern const uint8_t MODE_LONGDATA_MID_ACCURACY[];
 /**
  * Initialize the device data structure.
  */
-void dwInit(dwDevice_t* dev);
+void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr);
 
 /**
  * Set a userData pointer to the device.

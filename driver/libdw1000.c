@@ -60,13 +60,16 @@ static void dummy(){
   ;
 }
 
-void dwInit(dwDevice_t* dev)
+void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 {
 	dev->userdata = NULL;
 
 	/* Device default state */
 	//memcpy(dev->networkAndAddress, 0x00010001, LEN_PANADR); //PAN ID: 0001, Short Address:0001
-	*(uint32_t *)dev->networkAndAddress = 0x00010001;
+	dev->networkAndAddress[0] = PanID;
+	dev->networkAndAddress[1] = PanID>>8;
+	dev->networkAndAddress[2] = sourceAddr;
+	dev->networkAndAddress[3] = sourceAddr>>8;
 	dev->extendedFrameLength = FRAME_LENGTH_NORMAL;
 	dev->pacSize = PAC_SIZE_8;
 	dev->pulseFrequency = TX_PULSE_FREQ_16MHZ;
@@ -606,6 +609,68 @@ void dwSetPreambleCode(dwDevice_t* dev, uint8_t preacode) {
 	dev->preambleCode = preacode;
 }
 
+void dwSetcentreNodeConfig(dwDevice_t* dev) {
+	if(dev->deviceMode == TX_MODE) {
+		;
+	}
+	else if(dev->deviceMode == RX_MODE) {
+		;
+	}
+	else if(dev->deviceMode == IDLE_MODE) {
+		// set extended frame length (only use if frame is larger then 128)
+		dwUseExtendedFrameLength(dev, false);
+		//set smart power control mode
+		dwUseSmartPower(dev, true);
+		//set double buffer mode
+		dwSetDoubleBuffering(dev,false);
+		//auto switch to receive state after a bad receive
+		//if double buffer is enable, switch to receive state after a good receive
+		//if double buffer and auto acknowledgment are enable, auto transmit acknowledgment and switch to receive state
+		dwSetReceiverAutoReenable(dev,false);
+		//set auto turn on receiver after a transmit
+		dwWaitForResponse(dev,true);
+		//set auto send acknowledgment after receive a frame with a acknowledgment request
+		dwSetAutoAck(dev,true);
+		//set 3us to transmit ACK after receive and 10us to turn on receiver after transmit
+		dwSetAckAndRespTime(dev, 3, 10);
+		//set CRC frame check
+		dwSuppressFrameCheck(dev, false);
+		//set receiver timeout turn-off time
+		dwSetReceiveWaitTimeout(dev,0);
+		//set active high for interrupt
+		dwSetInterruptPolarity(dev, true);
+		//for global frame filtering
+		dwSetFrameFilter(dev, true);
+		//for data frame (poll, poll_ack, range, range report, range failed) filtering
+		dwSetFrameFilterAllowData(dev, true);
+		//for reserved (blink) frame filtering
+		dwSetFrameFilterAllowReserved(dev, false);
+		//for MAC frame filtering
+		dwSetFrameFilterAllowMAC(dev, true);
+		//for BEACON frame filtering
+		dwSetFrameFilterAllowBeacon(dev, false);
+		//for ACK frame filtering
+		dwSetFrameFilterAllowAcknowledgement(dev, true);
+		//sub_node act as coordinator
+		dwSetFrameFilterBehaveCoordinator(dev, true);
+
+		//interrupt active for complete transmit
+		dwInterruptOnSent(dev, true);
+		//interrupt active for complete receive
+		dwInterruptOnReceived(dev, true);
+		//interrupt active for receiver timeout when dwSetReceiveWaitTimeout() is enable true
+		dwInterruptOnReceiveTimeout(dev, false);
+		//interrupt active for receive error
+		dwInterruptOnReceiveFailed(dev, true);
+		//interrupt active for receive time stamp when time stamp is enable
+		dwInterruptOnReceiveTimestampAvailable(dev, false);
+		//interrupt active for auto acknowledgment trigger when time auto acknowledgment is enable
+		dwInterruptOnAutomaticAcknowledgeTrigger(dev, true);
+
+		// default mode when powering up the chip
+		// still explicitly selected for later tuning
+	}
+}
 
 void dwSetSubNodeConfig(dwDevice_t* dev) {
 	if(dev->deviceMode == TX_MODE) {
@@ -1488,6 +1553,30 @@ void dwSetAckAndRespTime(dwDevice_t *dev, uint32_t ack_time_us, uint32_t resp_ti
 	dwSpiWrite32(dev, ACK_RESP_T, ACK_RESP_T_SUB, ack_resp_tbuf);
 }
 
+void dwTxBufferFrameEncode(dwMacFrame_t* frame, bool isDataFrame, bool AckRequest,
+	uint16_t PanID, uint16_t DestAddr, uint16_t SourceAddr, uint8_t payLoad[], uint8_t payLoadLen)
+{
+
+	frame->frameControlHigh = 0x98; //16bit destination/source address,Frame version IEEE 802.15.4,PAN ID compression,no frame pending disable,security disable
+	frame->frameControlLow = 0x40;
+	if (isDataFrame)
+		frame->frameControlLow += 0x01; //data frame, sub-node collect data
+	else
+		frame->frameControlLow += 0x03; //command frame, center-node command
+
+	if (AckRequest)
+		frame->frameControlLow += 0x20; //request acknowledgment, such as wake-up command
+
+	frame->seqNum += 1;
+	frame->DestPanID = PanID;
+	frame->DestAddr = DestAddr;
+	frame->SourcePanID = PanID;
+	frame->SourceAddr = SourceAddr;
+
+	for (int i=0;i<payLoadLen;i++)
+		frame->Payload[i] = payLoad[i];
+}
+
 /*
  * GPIO odd irq handler
  * */
@@ -1519,7 +1608,7 @@ void dwDeviceInit(dwDevice_t *dev)
 	 * */
 	dwGpioInterruptConfig(dev);
 
-	dwInit(dev);
+	dwInit(dev, PAN_ID1, SLAVE_ADDR1);
 	dwConfigure(dev);
 	dwSetSubNodeConfig(dev);
 	//dwEnableMode(dev, MODE_SHORTDATA_FAST_LOWPOWER);
