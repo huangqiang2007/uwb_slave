@@ -1,3 +1,4 @@
+#include <timer.h>
 #include "main.h"
 #include "em_device.h"
 #include "em_cmu.h"
@@ -7,7 +8,6 @@
 #include "em_timer.h"
 #include "em_chip.h"
 #include "em_gpio.h"
-#include "timer.h"
 
 // Freq = 25M
 #define TOP 25000

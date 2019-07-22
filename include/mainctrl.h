@@ -95,7 +95,7 @@ bool g_received_cmd;
 
 bool g_dataRecvDone;
 
-extern void global_init(void);
+extern void globalInit(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
 extern int ParsePacket(void);
 extern void enqueue_frame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr);

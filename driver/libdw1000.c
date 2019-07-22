@@ -22,7 +22,7 @@
 #include <math.h>
 #include "em_cmu.h"
 #include "em_gpio.h"
-#include "time.h"
+#include "timer.h"
 #include "spidrv.h"
 #include "mainctrl.h"
 #include "libdw1000.h"

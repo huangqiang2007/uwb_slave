@@ -1,9 +1,9 @@
 #include <stdbool.h>
 #include <string.h>
+#include <timer.h>
 #include "em_usart.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
-#include "timer.h"
 #include "uartdrv.h"
 #include "mainctrl.h"
 #include "em_core.h"
@@ -16,7 +16,7 @@ int8_t SLAVE_ID = 0x0;
 
 volatile uint8_t g_slaveStatus = 0;
 
-void global_init(void)
+void globalInit(void)
 {
 	g_device_id = SLAVE_ID;
 	g_received_cmd = false;
