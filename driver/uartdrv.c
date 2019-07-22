@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include "em_core.h"
 #include "em_device.h"
 #include "em_usart.h"
 #include "em_gpio.h"

@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-
+#include <string.h>
 #include "libdw1000Spi.h"
 #include "spidrv.h"
 
