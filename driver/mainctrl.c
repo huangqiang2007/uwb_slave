@@ -23,6 +23,7 @@ void globalInit(void)
 {
 	g_device_id = SLAVE_ID;
 	g_received_cmd = false;
+	g_cur_mode = SLAVE_IDLEMODE;
 	memset(&g_recvSlaveFr, 0x00, sizeof(g_recvSlaveFr));
 	memset(&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
 	memset(&g_dwMacFrameSend, 0x00, sizeof(g_dwMacFrameSend));
@@ -106,6 +107,12 @@ void enqueueFrame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *
 		(uint8_t *)mainCtrlFr, sizeof(struct MainCtrlFrame));
 
 	frameQueue->len++;
+
+	/*
+	 * update state machine
+	 * */
+	g_received_cmd = true;
+	g_cur_mode = SLAVE_SAMPLEMODE;
 }
 
 struct MainCtrlFrame *dequeueFrame(struct ReceivedPacketQueue *frameQueue)
@@ -234,6 +241,13 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 		default:
 			break;
 	}
+
+	CORE_CriticalDisableIrq();
+	if (g_ReceivedPacketQueue.len == 0) {
+		g_idle_cmd_timeout = g_Ticks + IDLE_CMD_TIMEOUT;
+		g_cur_mode = SLAVE_IDLEMODE;
+	}
+	CORE_CriticalEnableIrq();
 
 	return ret;
 }

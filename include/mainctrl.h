@@ -7,6 +7,8 @@
 
 #define Q_LEN 4
 
+enum {SLAVE_IDLEMODE = 0, SLAVE_RTCIDLEMODE, SLAVE_CMDIDLEMODE, SLAVE_SAMPLEMODE};
+
 /*
  * the IDs for 4 slaves
  * [0, 1, 2, 3]
@@ -88,6 +90,8 @@ struct ReceivedPacketQueue {
 struct MainCtrlFrame g_mainCtrlFr, g_recvSlaveFr;
 dwMacFrame_t g_dwMacFrameSend, g_dwMacFrameRecv;
 struct ReceivedPacketQueue g_ReceivedPacketQueue;
+
+volatile uint8_t g_cur_mode;
 
 /*
  * true: received new cmd

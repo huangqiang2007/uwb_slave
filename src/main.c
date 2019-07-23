@@ -73,7 +73,7 @@ int main(void)
 	ADCStart();
 
 	/*
-	 * DW100 wireless device init, to do.
+	 * DW1000 wireless device init, to do.
 	 * */
 	dwDeviceInit(&g_dwDev);
 
@@ -96,25 +96,38 @@ int main(void)
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
 
 	while (1) {
-		/*
-		 * When the system is waken up, but it doesn't receive any CMD from
-		 * main node or manual node during 'g_idle_wkup_timeout' time window.
-		 * The system will enter into EM2 mode.
-		 * */
-		if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)
-			sleepAndRestore();
-		/*
-		 * When the system had received CMD, but it doesn't received CMD again
-		 * during 'g_idle_cmd_timeout' time window. The system will enter into
-		 * EM2 mode.
-		 * */
-		else if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
-			sleepAndRestore();
-		/*
-		 * Normally handle the received CMD
-		 * */
-		else {
-			ParsePacket(&g_dwDev, &g_dwMacFrameSend);
+		switch (g_cur_mode)
+		{
+			case SLAVE_IDLEMODE:
+				/*
+				 * When the system is waken up, but it doesn't receive any CMD from
+				 * main node or manual node during 'g_idle_wkup_timeout' time window.
+				 * The system will enter into EM2 mode.
+				 * */
+				if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)
+					g_cur_mode = SLAVE_RTCIDLEMODE;
+
+				/*
+				 * When the system had received CMD, but it doesn't received CMD again
+				 * during 'g_idle_cmd_timeout' time window. The system will enter into
+				 * EM2 mode.
+				 * */
+				if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
+					g_cur_mode = SLAVE_CMDIDLEMODE;
+
+				break;
+
+			case SLAVE_SAMPLEMODE:
+				ParsePacket(&g_dwDev, &g_dwMacFrameSend);
+				break;
+
+			case SLAVE_RTCIDLEMODE:
+			case SLAVE_CMDIDLEMODE:
+				sleepAndRestore();
+				break;
+
+			default:
+				g_cur_mode = SLAVE_IDLEMODE;
 		}
 	}
 }
