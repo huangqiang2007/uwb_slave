@@ -48,6 +48,11 @@ int main(void)
 	CHIP_Init();
 
 	/*
+	 * some global configuration
+	 * */
+	globalInit();
+
+	/*
 	 * config needed clock
 	 * */
 	clockConfig();
@@ -86,9 +91,9 @@ int main(void)
 	RtcSetup();
 
 	/*
-	 * some global configuration
+	 * reset g_idle_wkup_timeout duration upon bootup.
 	 * */
-	globalInit();
+	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
 
 	while (1) {
 		/*
@@ -97,19 +102,19 @@ int main(void)
 		 * The system will enter into EM2 mode.
 		 * */
 		if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)
-			EMU_EnterEM2(true);
+			sleepAndRestore();
 		/*
 		 * When the system had received CMD, but it doesn't received CMD again
 		 * during 'g_idle_cmd_timeout' time window. The system will enter into
 		 * EM2 mode.
 		 * */
 		else if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
-			EMU_EnterEM2(true);
+			sleepAndRestore();
 		/*
 		 * Normally handle the received CMD
 		 * */
 		else {
-			ParsePacket();
+			ParsePacket(&g_dwDev, &g_dwMacFrameSend);
 		}
 	}
 }

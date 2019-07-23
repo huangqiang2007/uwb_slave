@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "libdw1000Types.h"
 
 #define Q_LEN 4
 
@@ -85,6 +86,7 @@ struct ReceivedPacketQueue {
 };
 
 struct MainCtrlFrame g_mainCtrlFr, g_recvSlaveFr;
+dwMacFrame_t g_dwMacFrameSend, g_dwMacFrameRecv;
 struct ReceivedPacketQueue g_ReceivedPacketQueue;
 
 /*
@@ -96,8 +98,9 @@ bool g_received_cmd;
 bool g_dataRecvDone;
 
 extern void globalInit(void);
+extern void sleepAndRestore(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
-extern int ParsePacket(void);
-extern void enqueue_frame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr);
+extern int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame);
+extern void enqueueFrame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr);
 
 #endif

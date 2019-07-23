@@ -5,6 +5,7 @@
 #include "em_emu.h"
 #include "em_rtc.h"
 #include "em_gpio.h"
+#include "timer.h"
 
 #define DELAY_SECONDS 3.0
 #define LFXOFREQ      32768
@@ -16,13 +17,10 @@
 void RTC_IRQHandler(void)
 {
 	//Reset counter
-	RTC_CounterReset();
+	//RTC_CounterReset();
 
 	// Clear the interrupt source
 	RTC_IntClear(RTC_IFC_COMP0);
-
-	// Toggle LED 0
-	//GPIO_PinOutToggle(BSP_GPIO_LED0_PORT, BSP_GPIO_LED0_PIN);
 }
 
 /**************************************************************************//**
@@ -32,9 +30,6 @@ void initGPIO(void)
 {
 	//Turn on the clock for the GPIO
 	CMU_ClockEnable(cmuClock_GPIO, true);
-
-	//Enable LED0
-	//GPIO_PinModeSet(BSP_GPIO_LED0_PORT, BSP_GPIO_LED0_PIN, gpioModePushPull, 0);
 }
 
 /*

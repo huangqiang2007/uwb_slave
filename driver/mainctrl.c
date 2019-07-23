@@ -3,11 +3,14 @@
 #include <timer.h>
 #include "em_usart.h"
 #include "em_cmu.h"
+#include "em_emu.h"
+#include "em_rtc.h"
 #include "em_gpio.h"
 #include "uartdrv.h"
 #include "mainctrl.h"
 #include "em_core.h"
 #include "adcdrv.h"
+#include "libdw1000.h"
 
 /*
  * slave device ID 0x0 - 0x3 *
@@ -20,6 +23,29 @@ void globalInit(void)
 {
 	g_device_id = SLAVE_ID;
 	g_received_cmd = false;
+	memset(&g_recvSlaveFr, 0x00, sizeof(g_recvSlaveFr));
+	memset(&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
+	memset(&g_dwMacFrameSend, 0x00, sizeof(g_dwMacFrameSend));
+	memset((void *)&g_dwDev, 0x00, sizeof(g_dwDev));
+}
+
+void sleepAndRestore(void)
+{
+	/*
+	 * reenable RTC
+	 * */
+	RTC_CounterReset();
+
+	EMU_EnterEM2(true);
+
+	/*
+	 * re-init some global vars
+	 * */
+	globalInit();
+
+	/*
+	 * reset g_idle_wkup_timeout duration upon bootup.
+	 * */
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
 }
 
@@ -55,7 +81,7 @@ void InitFrame(struct MainCtrlFrame *mainCtrlFr, uint8_t src, uint8_t slave,
 	mainCtrlFr->crc1 = (data_crc >> 8) & 0xff;
 }
 
-bool queue_full(struct ReceivedPacketQueue *frameQueue)
+bool queueFull(struct ReceivedPacketQueue *frameQueue)
 {
 	if (frameQueue->len == Q_LEN)
 		return true;
@@ -63,7 +89,7 @@ bool queue_full(struct ReceivedPacketQueue *frameQueue)
 		return false;
 }
 
-bool queue_empty(struct ReceivedPacketQueue *frameQueue)
+bool queueEmpty(struct ReceivedPacketQueue *frameQueue)
 {
 	if (frameQueue->len == 0)
 		return true;
@@ -71,9 +97,9 @@ bool queue_empty(struct ReceivedPacketQueue *frameQueue)
 		return false;
 }
 
-void enqueue_frame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr)
+void enqueueFrame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr)
 {
-	if (queue_full(frameQueue))
+	if (queueFull(frameQueue))
 		return;
 
 	memcpy((uint8_t *)&(frameQueue->packets[frameQueue->p_in++]),
@@ -82,11 +108,11 @@ void enqueue_frame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame 
 	frameQueue->len++;
 }
 
-struct MainCtrlFrame *dequeue_frame(struct ReceivedPacketQueue *frameQueue)
+struct MainCtrlFrame *dequeueFrame(struct ReceivedPacketQueue *frameQueue)
 {
 	struct MainCtrlFrame *pmainCtrlFrame = NULL;
 
-	if (queue_empty(frameQueue))
+	if (queueEmpty(frameQueue))
 		return NULL;
 
 	pmainCtrlFrame = (struct MainCtrlFrame *)&(frameQueue->packets[frameQueue->p_out++]);
@@ -98,7 +124,16 @@ struct MainCtrlFrame *dequeue_frame(struct ReceivedPacketQueue *frameQueue)
 	return pmainCtrlFrame;
 }
 
-void form_sample_set_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+void sendTokenFrame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
+{
+	uint16_t pan_id = PAN_ID1, source_addr = SLAVE_ADDR1 + ((pMainCtrlFrame->frameCtrl & 0x0f) - 1);
+
+	dwTxBufferFrameEncode(&g_dwMacFrameSend, 0, 1, pan_id, source_addr,
+		source_addr, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame));
+	dwSendData(dev, (uint8_t *)dwMacFrame, sizeof(*dwMacFrame));
+}
+
+void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
@@ -110,9 +145,11 @@ void form_sample_set_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
 }
 
-void form_sample_data_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
@@ -129,9 +166,11 @@ void form_sample_data_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
 }
 
-void form_slave_status_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
@@ -143,9 +182,11 @@ void form_slave_status_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
 }
 
-void form_sleep_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
+void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
 	uint16_t data_crc;
 
@@ -157,14 +198,16 @@ void form_sleep_token_frame(struct MainCtrlFrame *pMainCtrlFrame)
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
 }
 
-int ParsePacket(void)
+int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 {
 	struct MainCtrlFrame *pMainCtrlFrame = NULL;
 	int ret = -1;
 
-	pMainCtrlFrame = dequeue_frame(&g_ReceivedPacketQueue);
+	pMainCtrlFrame = dequeueFrame(&g_ReceivedPacketQueue);
 	if (!pMainCtrlFrame)
 		return ret;
 	else
@@ -173,19 +216,19 @@ int ParsePacket(void)
 	switch (pMainCtrlFrame->frameType)
 	{
 		case ENUM_SAMPLE_SET:
-			form_sample_set_token_frame(pMainCtrlFrame);
+			form_sample_set_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
 		case ENUM_SAMPLE_DATA:
-			form_sample_data_token_frame(pMainCtrlFrame);
+			form_sample_data_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
 		case ENUM_SLAVE_STATUS:
-			form_slave_status_token_frame(pMainCtrlFrame);
+			form_slave_status_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
 		case ENUM_SLAVE_SLEEP:
-			form_sleep_token_frame(pMainCtrlFrame);
+			form_sleep_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
 		default:

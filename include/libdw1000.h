@@ -216,6 +216,9 @@ char* dwStrError(int error);
 
 void delayms(uint32_t msecs);
 
+void dwTxBufferFrameEncode(dwMacFrame_t* frame, bool isDataFrame, bool AckRequest,
+	uint16_t PanID, uint16_t DestAddr, uint16_t SourceAddr, uint8_t payLoad[], uint8_t payLoadLen);
+
 /*
  * dw1000 init
  * */
