@@ -168,7 +168,7 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	/*
 	 * to do
 	 * */
-	pMainCtrlFrame->data[0] = g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.out].adc_sample_buffer[0];
+	pMainCtrlFrame->data[0] = g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.out];
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;

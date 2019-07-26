@@ -27,7 +27,7 @@ typedef struct {
 typedef struct {
 	volatile int8_t samples;
 	int8_t in, out;
-	volatile ADC_SAMPLE_BUFFERDef adc_smaple_data[ADC_SAMPLE_BUFFER_NUM];
+	volatile uint8_t adc_smaple_data[ADC_SAMPLE_BUFFER_NUM];
 } AdcSampleDataQueueDef;
 
 AdcSampleDataQueueDef g_adcSampleDataQueue;

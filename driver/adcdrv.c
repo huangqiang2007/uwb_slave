@@ -43,15 +43,14 @@ void ADCConfig(void)
 	/*
 	* Init for scan sequence use: 7 AD sample channels
 	* */
-	scanInit.rep = true;
+	scanInit.rep = false;
 	scanInit.reference = adcRef2V5;
 	scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
 
 	/*
 	 * to do?
 	 * */
-	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH0 | ADC_SCANCTRL_INPUTMASK_CH1
-					| ADC_SCANCTRL_INPUTMASK_CH2 | ADC_SCANCTRL_INPUTMASK_CH3;
+	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4;
 	ADC_InitScan(ADC0, &scanInit);
 
 	/*
@@ -62,8 +61,8 @@ void ADCConfig(void)
 
 void DMA_ADC_callback(unsigned int channel, bool primary, void *user)
 {
-	ADC_SAMPLE_BUFFERDef *pSampleBuff = NULL;
 	static uint8_t drop_cnt = 0;
+	uint8_t *precvBuf = NULL;
 
 	/*
 	 * drop first some samples since it's likely ADC
@@ -79,15 +78,19 @@ void DMA_ADC_callback(unsigned int channel, bool primary, void *user)
 	if (g_adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM)
 		g_adcSampleDataQueue.in = 0;
 
+	precvBuf = &(g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
+
 out:
 	/* Re-activate the DMA */
 	DMA_RefreshPingPong(channel,
 						primary,
 						false,
-						(void *)&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in],
+						(void *)precvBuf,
 						(void *)&(ADC0->SCANDATA),
 						ADC_CHNL_NUM - 1,
 						false);
+
+	ADC_Start(ADC0, adcStartScan);
 }
 
 /*
