@@ -122,7 +122,7 @@ void DMAConfig(void)
 	chnlCfg.enableInt = true;
 	chnlCfg.select = DMAREQ_ADC0_SCAN;
 	chnlCfg.cb = &dma_adc_cb;
-	DMA_CfgChannel(DMA_CHANNEL, &chnlCfg);
+	DMA_CfgChannel(ADC_SCAN_DMA_CH, &chnlCfg);
 
 	/*
 	* one byte per transfer
@@ -132,12 +132,12 @@ void DMAConfig(void)
 	descrCfg.size = dmaDataSize1;
 	descrCfg.arbRate = dmaArbitrate1;
 	descrCfg.hprot = 0;
-	DMA_CfgDescr(DMA_CHANNEL, true, &descrCfg);
-	DMA_CfgDescr(DMA_CHANNEL, false, &descrCfg);
+	DMA_CfgDescr(ADC_SCAN_DMA_CH, true, &descrCfg);
+	DMA_CfgDescr(ADC_SCAN_DMA_CH, false, &descrCfg);
 
 	// Start DMA
 	DMA_ActivatePingPong(
-		DMA_CHANNEL,
+		ADC_SCAN_DMA_CH,
 		false,
 		(void *)&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in], // primary destination
 		(void *)&(ADC0->SCANDATA), // primary source
