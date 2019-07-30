@@ -58,6 +58,11 @@ int main(void)
 	clockConfig();
 
 	/*
+	 * config timer0 and timer1
+	 * */
+	timer_init();
+
+	/*
 	 * RS422 Uart init for delivering converted data
 	 * */
 	uartSetup();
@@ -77,10 +82,7 @@ int main(void)
 	 * */
 	dwDeviceInit(&g_dwDev);
 
-	/*
-	 * config timer0 and timer1
-	 * */
-	timer_init();
+
 
 	UDELAY_Calibrate();
 	Delay_ms(500);

@@ -17,11 +17,17 @@
  * */
 int8_t SLAVE_ID = 0x0;
 
+devInfo_t g_devInfo = {
+		.devId = SLAVE_ADDR1,
+		.panId = PAN_ID1,
+		.srcId = SLAVE_ADDR1,
+};
+
 volatile uint8_t g_slaveStatus = 0;
 
 void globalInit(void)
 {
-	g_device_id = SLAVE_ID;
+	g_device_id = g_devInfo.devId;
 	g_received_cmd = false;
 	g_cur_mode = SLAVE_IDLEMODE;
 	memset(&g_recvSlaveFr, 0x00, sizeof(g_recvSlaveFr));

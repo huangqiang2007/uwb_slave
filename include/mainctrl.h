@@ -51,6 +51,12 @@ enum {
 	ENUM_SLAVE_SLEEP_TOKEN
 };
 
+typedef struct {
+	int8_t devId;
+	uint16_t panId;
+	uint16_t srcId;
+} devInfo_t;
+
 #define FRAME_DATA_LEN 5
 
 struct MainCtrlFrame {
