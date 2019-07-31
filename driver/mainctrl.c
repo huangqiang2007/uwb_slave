@@ -139,9 +139,9 @@ struct MainCtrlFrame *dequeueFrame(struct ReceivedPacketQueue *frameQueue)
 
 void sendTokenFrame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
-	uint16_t pan_id = PAN_ID1, source_addr = SLAVE_ADDR1 + ((pMainCtrlFrame->frameCtrl & 0x0f) - 1);
+	uint16_t pan_id = PAN_ID1, source_addr = SLAVE_ADDR1, dest_addr = CENTER_ADDR1;
 
-	dwTxBufferFrameEncode(&g_dwMacFrameSend, 0, 1, pan_id, source_addr,
+	dwTxBufferFrameEncode(&g_dwMacFrameSend, 1, 0, pan_id, dest_addr,
 		source_addr, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame));
 	dwSendData(dev, (uint8_t *)dwMacFrame, sizeof(*dwMacFrame));
 }
@@ -256,4 +256,15 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 	CORE_CriticalEnableIrq();
 
 	return ret;
+}
+
+void powerADandUWB(uint8_t master)
+{
+	if (master == 1) {
+		GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
+		GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 0);
+	} else {
+		GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
+		GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);
+	}
 }

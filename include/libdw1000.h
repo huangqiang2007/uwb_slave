@@ -31,6 +31,7 @@ dwDevice_t g_dwDev;
 
 enum {PAN_ID1 = 0x0001, PAN_ID2};
 enum {SLAVE_ADDR1 = 0x0001, SLAVE_ADDR2, SLAVE_ADDR3, SLAVE_ADDR4};
+enum {CENTER_ADDR1 = 0x0011, CENTER_ADDR2};
 
 // Default Mode of operation
 extern const uint8_t MODE_LONGDATA_RANGE_LOWPOWER[];

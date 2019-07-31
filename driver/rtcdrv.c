@@ -7,7 +7,7 @@
 #include "em_gpio.h"
 #include "timer.h"
 
-#define DELAY_SECONDS 3.0
+#define DELAY_SECONDS 10.0
 #define LFXOFREQ      32768
 #define COMPARE_TOP   (DELAY_SECONDS * LFXOFREQ - 1)
 
@@ -49,6 +49,8 @@ void RtcSetup(void)
 
 	// Set RTC compare value for RTC 0
 	RTC_CompareSet(0, COMPARE_TOP);
+
+	RTC_IntClear(RTC_IFC_COMP0 | RTC_IFC_COMP1);
 
 	// Allow channel 0 to cause an interrupt
 	RTC_IntEnable(RTC_IEN_COMP0);

@@ -112,5 +112,6 @@ extern void sleepAndRestore(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
 extern int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame);
 extern void enqueueFrame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr);
+extern void powerADandUWB(uint8_t master);
 
 #endif

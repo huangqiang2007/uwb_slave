@@ -33,18 +33,18 @@
 
 /** DMA control block array, requires proper alignment. */
 SL_ALIGN(DMACTRL_ALIGNMENT)
-static DMA_DESCRIPTOR_TypeDef dmaControlBlock[DMACTRL_CH_CNT * 2] SL_ATTRIBUTE_ALIGN(DMACTRL_ALIGNMENT);
+DMA_DESCRIPTOR_TypeDef dmaControlBlock[DMACTRL_CH_CNT * 2] SL_ATTRIBUTE_ALIGN(DMACTRL_ALIGNMENT);
 
-#define TX_BUFFER_SIZE   10
-#define RX_BUFFER_SIZE   TX_BUFFER_SIZE
+//#define TX_BUFFER_SIZE   10
+//#define RX_BUFFER_SIZE   TX_BUFFER_SIZE
+//
+//uint8_t TxBuffer1[TX_BUFFER_SIZE] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+//uint8_t TxBuffer2[TX_BUFFER_SIZE] = {0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+//uint8_t TxBuffer3[TX_BUFFER_SIZE] = {0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+//uint8_t RxBuffer[RX_BUFFER_SIZE] = {0};
 
-uint8_t TxBuffer1[TX_BUFFER_SIZE] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-uint8_t TxBuffer2[TX_BUFFER_SIZE] = {0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-uint8_t TxBuffer3[TX_BUFFER_SIZE] = {0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-uint8_t RxBuffer[RX_BUFFER_SIZE] = {0};
-
-uint32_t channelNumTX     = SPI_TX_DMA_CH;
-uint32_t channelNumRX     = SPI_RX_DMA_CH;
+uint32_t channelNumTX     = 1;
+uint32_t channelNumRX     = 0;
 
 /**************************************************************************//**
  * @brief callback function that will trigger after a completed DMA transfer
@@ -78,6 +78,7 @@ void refreshTxTransfer(uint32_t channelNum,
  *    function. If reference isn't valid anymore, then all dma transfers after
  *    the first one will fail.
  *****************************************************************************/
+//void initTransferDma(uint8_t *txbuf, int txlen)
 void initTransferDma(void)
 {
 	// Callback configuration for TX
@@ -108,6 +109,7 @@ void initTransferDma(void)
  *    Initialize the DMA module to receive packets via USART and transfer
  *    them to a buffer
  *****************************************************************************/
+//void initReceiveDma(uint8_t *rxbuf, int rxlen)
 void initReceiveDma(void)
 {
 	// Callback configuration for RX
@@ -137,7 +139,7 @@ void initReceiveDma(void)
 /**************************************************************************//**
  * @brief Initialize USART1
  *****************************************************************************/
-void initUSART1 (void)
+void initUSART1 (int SpiClk)
 {
 	CMU_ClockEnable(cmuClock_GPIO, true);
 	CMU_ClockEnable(cmuClock_USART1, true);
@@ -151,7 +153,7 @@ void initUSART1 (void)
 	// Start with default config, then modify as necessary
 	USART_InitSync_TypeDef config = USART_INITSYNC_DEFAULT;
 	//config.master       = true;            // master mode
-	config.baudrate     = 1000000;         // CLK freq is 1 MHz
+	config.baudrate     = SpiClk;         // CLK freq is 1 MHz
 	config.autoCsEnable = true;            // CS pin controlled by hardware, not firmware
 	config.clockMode    = usartClockMode0; // clock idle low, sample on rising/first edge
 	config.msbf         = true;            // send MSB first
@@ -163,13 +165,14 @@ void initUSART1 (void)
 		| USART_ROUTE_RXPEN | USART_ROUTE_LOCATION_LOC0;
 
 	// Enable USART1
-	//USART_Enable(USART1, usartEnable);
 	USART1->CMD |= (usartEnable | USART_CMD_MASTEREN);
 }
 
 void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 		uint8_t *rxbuf, int rxlen)
 {
+	uint32_t status = 0, status_txc = 0x20;
+
 	memset(spiTransDes, 0x00, sizeof(*spiTransDes));
 	memcpy(spiTransDes->txBuf, txbuf, txlen);
 	spiTransDes->rxBuf = rxbuf;
@@ -188,43 +191,42 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 						(void *) spiTransDes->txBuf,         // Source address to transfer from
 						txlen + rxlen - 1);       // Number of DMA transfers minus 1
 
-	/*
-	 * wait recvDone flag, indicate that the expected data
-	 * has been received completely.
-	 * */
-	while (spiTransDes->recvDone == false);
+	//while (spiTransDes->recvDone == false);
+	status = USART1->STATUS;
+	while (!(status & status_txc)) {
+		status = USART1->STATUS;
+		if (spiTransDes->uwbIRQOccur)
+			break;
+	}
 }
 
 void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 {
+	uint32_t status = 0, status_txc = 0x20;
+
 	memset(spiTransDes, 0x00, sizeof(*spiTransDes));
 	memcpy(spiTransDes->txBuf, txbuf, txlen);
 
-	DMA_ActivateBasic(channelNumRX,
-						true,
-						false,
-						(void *) spiTransDes->rxBuf,         // Destination address to transfer to
-						(void *) &USART1->RXDATA,  // Source address to transfer from
-						txlen  - 1);       // Number of DMA transfers minus 1
-
 	DMA_ActivateBasic(channelNumTX,
-						true,
-						false,
-						(void *) &USART1->TXDATA,  // Destination address to transfer to
-						(void *) spiTransDes->txBuf,         // Source address to transfer from
-						txlen - 1);       // Number of DMA transfers minus 1
+					true,
+					false,
+					(void *) &USART1->TXDATA,  // Destination address to transfer to
+					(void *) spiTransDes->txBuf,         // Source address to transfer from
+					txlen - 1);       // Number of DMA transfers minus 1
 
-	/*
-	 * wait sendDone flag, indicate that the data
-	 * have been sent completely.
-	 * */
-	while (spiTransDes->sendDone == false);
+	//while (spiTransDes->sendDone == false);
+	status = USART1->STATUS;
+	while (!(status & status_txc)) {
+		status = USART1->STATUS;
+		if (spiTransDes->uwbIRQOccur)
+			break;
+	}
 }
 
-void SPIDMAInit(void)
+void SPIDMAInit()
 {
 	// Initialize USART1 as SPI slave
-	initUSART1();
+	initUSART1(dwSpiSpeedLow);
 
 	// Initializing the DMA
 	DMA_Init_TypeDef init;

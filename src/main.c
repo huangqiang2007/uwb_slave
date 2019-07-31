@@ -58,44 +58,51 @@ int main(void)
 	clockConfig();
 
 	/*
+	 * power up UWB, power down AD
+	 * */
+	powerADandUWB(1);
+
+	/*
 	 * config timer0 and timer1
 	 * */
 	timer_init();
-
+	Delay_ms(5);
+	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 0);
+	Delay_ms(5);
+	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 1);
 	/*
 	 * RS422 Uart init for delivering converted data
 	 * */
-	uartSetup();
+	//uartSetup();
+
 
 	/*
 	 * SPI master config
 	 * */
-	SPIConfig(SPI_CLK);
+	SPIDMAInit();
 
 	/*
 	 * config and start ADC via DMA
 	 * */
-	ADCStart();
+	//ADCStart();
 
 	/*
 	 * DW1000 wireless device init, to do.
 	 * */
 	dwDeviceInit(&g_dwDev);
 
-
-
 	UDELAY_Calibrate();
 	Delay_ms(500);
-
-	/*
-	 * init RTC for LFRCO 32.768KHz
-	 * */
-	RtcSetup();
 
 	/*
 	 * reset g_idle_wkup_timeout duration upon bootup.
 	 * */
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
+	/*
+	 * init RTC for LFRCO 32.768KHz
+	 * */
+//	RtcSetup();
+//	sleepAndRestore();
 
 	while (1) {
 		switch (g_cur_mode)
