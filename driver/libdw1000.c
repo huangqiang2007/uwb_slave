@@ -1559,7 +1559,7 @@ void dwLowPowerListenMode(dwDevice_t *dev, uint32_t listen_timeout_us, uint32_t 
 	uint16_t listen_timeout;
 	uint8_t timeout_snoze;
 	listen_timeout = listen_timeout_us/dev->pacSize;
-	timeout_snoze = timeout_snoze_us*19/512;
+	timeout_snoze = timeout_snoze_us*192/10/512;
 	dwSetAfterRxAutoSleep(dev);
 	dwSetPreambleDectTimeOut(dev, listen_timeout);
 	dwSetSnozeTime(dev, timeout_snoze);

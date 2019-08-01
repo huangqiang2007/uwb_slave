@@ -42,6 +42,12 @@ void clockConfig(void)
 	CMU_ClockEnable(cmuClock_TIMER1, true);
 }
 
+void adc_test(void)
+{
+	while (1)
+		ADCPoll();
+}
+
 int main(void)
 {
 	/* Chip errata */
@@ -84,8 +90,10 @@ int main(void)
 	/*
 	 * config and start ADC via DMA
 	 * */
-	//ADCStart();
+	ADCStart();
 
+	//adc_test();
+	//ADCPoll();
 	/*
 	 * DW1000 wireless device init, to do.
 	 * */
@@ -105,6 +113,7 @@ int main(void)
 //	sleepAndRestore();
 
 	while (1) {
+		ADCPoll();
 		switch (g_cur_mode)
 		{
 			case SLAVE_IDLEMODE:
@@ -138,6 +147,46 @@ int main(void)
 			default:
 				g_cur_mode = SLAVE_IDLEMODE;
 		}
+
+//		switch (g_cur_mode)
+//		{
+//			case SLAVE_IDLEMODE:
+//				/*
+//				 * When the system is waken up, but it doesn't receive any CMD from
+//				 * main node or manual node during 'g_idle_wkup_timeout' time window.
+//				 * The system will enter into EM2 mode.
+//				 * */
+//				if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)
+//					g_cur_mode = SLAVE_RTCIDLEMODE;
+//
+//				/*
+//				 * When the system had received CMD, but it doesn't received CMD again
+//				 * during 'g_idle_cmd_timeout' time window. The system will enter into
+//				 * EM2 mode.
+//				 * */
+//				if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
+//					g_cur_mode = SLAVE_CMDIDLEMODE;
+//
+//				break;
+//
+//			case SLAVE_SAMPLEMODE:
+//				ParsePacket(&g_dwDev, &g_dwMacFrameSend);
+//				break;
+//
+//			case SLAVE_RTCIDLEMODE:
+//			case SLAVE_CMDIDLEMODE:
+//				dwLowPowerListenMode(&g_dwDev, 10000, 3000);
+//				EMU_EnterEM2(true);
+//				/*
+//				 * re-init some global vars
+//				 * */
+//				globalInit();
+//				break;
+//				//sleepAndRestore();
+//
+//			default:
+//				g_cur_mode = SLAVE_CMDIDLEMODE;
+//		}
 	}
 }
 

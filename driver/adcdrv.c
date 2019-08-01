@@ -12,7 +12,7 @@
 /*
  * ADC sample clock
  * */
-#define ADC_CLK_1M 1000000
+#define ADC_CLK_1M 5000
 
 /*
  * drop several samples before ADC is stable.
@@ -20,6 +20,30 @@
 #define ADC_IGNORE_CNT 5
 
 DMA_CB_TypeDef dma_adc_cb;
+
+void initADC (void)
+{
+	// Enable ADC0 clock
+	CMU_ClockEnable(cmuClock_ADC0, true);
+
+	// Declare init structs
+	ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
+	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
+
+	// Modify init structs and initialize
+	init.prescale = ADC_PrescaleCalc(ADC_CLK_1M, 0); // Init to max ADC clock for Series 0
+
+	initSingle.diff       = false;        // single ended
+	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
+	initSingle.resolution = adcRes8Bit;  // 12-bit resolution
+
+	// Select ADC input. See README for corresponding EXP header pin.
+	initSingle.input = adcSingleInputCh4;
+	init.timebase = ADC_TimebaseCalc(0);
+
+	ADC_Init(ADC0, &init);
+	ADC_InitSingle(ADC0, &initSingle);
+}
 
 /*
  * @brief
@@ -147,13 +171,35 @@ void DMAConfig(void)
 		ADC_CHNL_NUM - 1);
 }
 
+void ADCPoll(void)
+{
+	uint8_t *precvBuf = NULL;
+
+	g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
+	g_adcSampleDataQueue.in++;
+	if (g_adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM)
+		g_adcSampleDataQueue.in = 0;
+
+	precvBuf = &(g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
+
+	// Start ADC conversion
+	ADC_Start(ADC0, adcStartSingle);
+
+	// Wait for conversion to be complete
+	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK));
+
+	// Get ADC result
+	precvBuf[0] = ADC_DataSingleGet(ADC0);
+}
+
 void ADCStart(void)
 {
-	ADCConfig();
-	DMAConfig();
+	//ADCConfig();
+	//DMAConfig();
+	initADC();
 
 	/*
 	 * Start Scan
 	 * */
-	ADC_Start(ADC0, adcStartScan);
+	//ADC_Start(ADC0, adcStartScan);
 }
