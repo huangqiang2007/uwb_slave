@@ -171,6 +171,18 @@ void DMAConfig(void)
 		ADC_CHNL_NUM - 1);
 }
 
+void ADCStart(void)
+{
+	//ADCConfig();
+	//DMAConfig();
+	initADC();
+
+	/*
+	 * Start Scan
+	 * */
+	//ADC_Start(ADC0, adcStartScan);
+}
+
 void ADCPoll(void)
 {
 	uint8_t *precvBuf = NULL;
@@ -190,16 +202,4 @@ void ADCPoll(void)
 
 	// Get ADC result
 	precvBuf[0] = ADC_DataSingleGet(ADC0);
-}
-
-void ADCStart(void)
-{
-	//ADCConfig();
-	//DMAConfig();
-	initADC();
-
-	/*
-	 * Start Scan
-	 * */
-	//ADC_Start(ADC0, adcStartScan);
 }

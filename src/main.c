@@ -90,10 +90,8 @@ int main(void)
 	/*
 	 * config and start ADC via DMA
 	 * */
-	ADCStart();
+	initADC();
 
-	//adc_test();
-	//ADCPoll();
 	/*
 	 * DW1000 wireless device init, to do.
 	 * */

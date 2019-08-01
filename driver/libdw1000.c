@@ -1672,11 +1672,9 @@ void dwRecvData(dwDevice_t *dev)
 	int len = 0;
 
 	memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
-//	dwNewReceive(dev);
-//	dwStartReceive(dev);
 	len = dwGetDataLength(dev);
 	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
 	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
-
+	enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
 	g_dataRecvDone = true;
 }
