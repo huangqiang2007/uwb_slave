@@ -84,7 +84,7 @@ int main(void)
 	/*
 	 * config and start ADC via DMA
 	 * */
-	//ADCStart();
+	initADC();
 
 	/*
 	 * DW1000 wireless device init, to do.
@@ -105,6 +105,7 @@ int main(void)
 //	sleepAndRestore();
 
 	while (1) {
+		ADCPoll();
 		switch (g_cur_mode)
 		{
 			case SLAVE_IDLEMODE:

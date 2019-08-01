@@ -33,5 +33,7 @@ typedef struct {
 AdcSampleDataQueueDef g_adcSampleDataQueue;
 
 extern void ADCStart(void);
+extern void initADC(void);
+extern void ADCPoll(void);
 
 #endif /* ADCDRV_H_ */
