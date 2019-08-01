@@ -35,16 +35,8 @@
 SL_ALIGN(DMACTRL_ALIGNMENT)
 DMA_DESCRIPTOR_TypeDef dmaControlBlock[DMACTRL_CH_CNT * 2] SL_ATTRIBUTE_ALIGN(DMACTRL_ALIGNMENT);
 
-//#define TX_BUFFER_SIZE   10
-//#define RX_BUFFER_SIZE   TX_BUFFER_SIZE
-//
-//uint8_t TxBuffer1[TX_BUFFER_SIZE] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-//uint8_t TxBuffer2[TX_BUFFER_SIZE] = {0x04, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-//uint8_t TxBuffer3[TX_BUFFER_SIZE] = {0x03, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
-//uint8_t RxBuffer[RX_BUFFER_SIZE] = {0};
-
-uint32_t channelNumTX     = 1;
-uint32_t channelNumRX     = 0;
+uint32_t channelNumTX = SPI_TX_DMA_CH;
+uint32_t channelNumRX = SPI_RX_DMA_CH;
 
 /**************************************************************************//**
  * @brief callback function that will trigger after a completed DMA transfer
@@ -191,7 +183,6 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 						(void *) spiTransDes->txBuf,         // Source address to transfer from
 						txlen + rxlen - 1);       // Number of DMA transfers minus 1
 
-	//while (spiTransDes->recvDone == false);
 	status = USART1->STATUS;
 	while (!(status & status_txc)) {
 		status = USART1->STATUS;
@@ -214,7 +205,6 @@ void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 					(void *) spiTransDes->txBuf,         // Source address to transfer from
 					txlen - 1);       // Number of DMA transfers minus 1
 
-	//while (spiTransDes->sendDone == false);
 	status = USART1->STATUS;
 	while (!(status & status_txc)) {
 		status = USART1->STATUS;
