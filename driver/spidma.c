@@ -169,8 +169,6 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 	memcpy(spiTransDes->txBuf, txbuf, txlen);
 	spiTransDes->rxBuf = rxbuf;
 
-	ADC_Start(ADC0, (1 << 3));
-
 	DMA_ActivateBasic(channelNumRX,
 						true,
 						false,
@@ -191,8 +189,6 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 		if (spiTransDes->uwbIRQOccur)
 			break;
 	}
-
-	ADC_Start(ADC0, (1 << 2));
 }
 
 void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
@@ -201,8 +197,6 @@ void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 
 	memset(spiTransDes, 0x00, sizeof(*spiTransDes));
 	memcpy(spiTransDes->txBuf, txbuf, txlen);
-
-	ADC_Start(ADC0, (1 << 3));
 
 	DMA_ActivateBasic(channelNumTX,
 					true,
@@ -217,8 +211,6 @@ void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 		if (spiTransDes->uwbIRQOccur)
 			break;
 	}
-
-	ADC_Start(ADC0, (1 << 2));
 }
 
 void SPIDMAInit()
