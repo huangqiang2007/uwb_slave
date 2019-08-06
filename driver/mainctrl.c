@@ -41,18 +41,28 @@ void sleepAndRestore(void)
 	/*
 	 * reenable RTC
 	 * */
+	dwIdle(&g_dwDev);
+	dwSetSleep(&g_dwDev);
+	Delay_ms(1);
 	RTC_CounterReset();
-
+	//CMU->OSCENCMD |= 0x08;
 	EMU_EnterEM2(true);
-
+	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 1);
+	Delay_ms(2);
+	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 0);
 	/*
 	 * re-init some global vars
 	 * */
 	globalInit();
-
+	dwDeviceInit(&g_dwDev);
+	UDELAY_Calibrate();
+	Delay_ms(1);
 	/*
 	 * reset g_idle_wkup_timeout duration upon bootup.
 	 * */
+	dwNewReceive(&g_dwDev);
+	dwStartReceive(&g_dwDev);
+	g_Ticks = 0;
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
 }
 
@@ -139,11 +149,12 @@ struct MainCtrlFrame *dequeueFrame(struct ReceivedPacketQueue *frameQueue)
 
 void sendTokenFrame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
-	uint16_t pan_id = PAN_ID1, source_addr = SLAVE_ADDR1, dest_addr = CENTER_ADDR1;
-
-	dwTxBufferFrameEncode(&g_dwMacFrameSend, 1, 0, pan_id, dest_addr,
-		source_addr, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame));
-	dwSendData(dev, (uint8_t *)dwMacFrame, sizeof(*dwMacFrame));
+//	uint16_t pan_id = PAN_ID1, source_addr = SLAVE_ADDR1, dest_addr = CENTER_ADDR1;
+//
+//	dwTxBufferFrameEncode(&g_dwMacFrameSend, 1, 0, pan_id, dest_addr,
+//		source_addr, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame));
+//	dwSendData(dev, (uint8_t *)dwMacFrame, sizeof(*dwMacFrame));
+	dwSendData(dev, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame));
 }
 
 void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -261,10 +272,8 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 void powerADandUWB(uint8_t master)
 {
 	if (master == 1) {
-		GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
-		GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 0);
-	} else {
-		GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
 		GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 1);
+	} else {
+		GPIO_PinModeSet(gpioPortA, 0, gpioModePushPull, 0);
 	}
 }

@@ -5,6 +5,7 @@
 #include "em_emu.h"
 #include "em_adc.h"
 #include "em_cmu.h"
+#include "em_rtc.h"
 #include "udelay.h"
 #include "hal-config.h"
 #include "main.h"
@@ -25,7 +26,7 @@ void clockConfig(void)
 	 * */
 	CMU_OscillatorEnable(cmuOsc_HFXO, true, true);
 	CMU_ClockSelectSet(cmuClock_HF, cmuSelect_HFXO);
-	CMU_OscillatorEnable(cmuOsc_HFRCO, false, false);
+	//CMU_OscillatorEnable(cmuOsc_HFRCO, false, false);
 
 	CMU_ClockSelectSet(cmuClock_LFA, cmuSelect_ULFRCO);
 	CMU_OscillatorEnable(cmuSelect_ULFRCO, true, true);
@@ -48,8 +49,37 @@ void adc_test(void)
 		ADCPoll();
 }
 
+void rtc_test(void)
+{
+	RtcSetup();
+	while (1) {
+		//EMU_EnterEM2(false);
+		Delay_ms(1000);
+//		SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+//		SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+//		__WFI();
+		EMU_EnterEM2(true);
+		RtcSetup();
+	}
+}
+
+int main1(void)
+{
+	/* Chip errata */
+	CHIP_Init();
+
+	clockConfig();
+
+	timer_init();
+	Delay_ms(8000);
+
+	rtc_test();
+}
+
 int main(void)
 {
+
+
 	/* Chip errata */
 	CHIP_Init();
 
@@ -66,7 +96,7 @@ int main(void)
 	/*
 	 * power up UWB, power down AD
 	 * */
-	powerADandUWB(1);
+	powerADandUWB(0);
 
 	/*
 	 * config timer0 and timer1
@@ -81,7 +111,7 @@ int main(void)
 	 * */
 	//uartSetup();
 
-
+	//powerADandUWB(1);
 	/*
 	 * SPI master config
 	 * */
@@ -93,28 +123,33 @@ int main(void)
 	initADC();
 
 	/*
+	 * init RTC for LFRCO 32.768KHz
+	 * */
+	RtcSetup();
+//	rtc_test();
+	/*
 	 * DW1000 wireless device init, to do.
 	 * */
+	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 1);
+	Delay_ms(2);
+	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 0);
 	dwDeviceInit(&g_dwDev);
 
 	UDELAY_Calibrate();
 	Delay_ms(500);
-
 	/*
 	 * reset g_idle_wkup_timeout duration upon bootup.
 	 * */
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
-	/*
-	 * init RTC for LFRCO 32.768KHz
-	 * */
-//	RtcSetup();
-//	sleepAndRestore();
+	dwNewReceive(&g_dwDev);
+	dwStartReceive(&g_dwDev);
 
 	while (1) {
 		ADCPoll();
 		switch (g_cur_mode)
 		{
 			case SLAVE_IDLEMODE:
+
 				/*
 				 * When the system is waken up, but it doesn't receive any CMD from
 				 * main node or manual node during 'g_idle_wkup_timeout' time window.
@@ -145,46 +180,6 @@ int main(void)
 			default:
 				g_cur_mode = SLAVE_IDLEMODE;
 		}
-
-//		switch (g_cur_mode)
-//		{
-//			case SLAVE_IDLEMODE:
-//				/*
-//				 * When the system is waken up, but it doesn't receive any CMD from
-//				 * main node or manual node during 'g_idle_wkup_timeout' time window.
-//				 * The system will enter into EM2 mode.
-//				 * */
-//				if (!g_received_cmd && g_Ticks > g_idle_wkup_timeout)
-//					g_cur_mode = SLAVE_RTCIDLEMODE;
-//
-//				/*
-//				 * When the system had received CMD, but it doesn't received CMD again
-//				 * during 'g_idle_cmd_timeout' time window. The system will enter into
-//				 * EM2 mode.
-//				 * */
-//				if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
-//					g_cur_mode = SLAVE_CMDIDLEMODE;
-//
-//				break;
-//
-//			case SLAVE_SAMPLEMODE:
-//				ParsePacket(&g_dwDev, &g_dwMacFrameSend);
-//				break;
-//
-//			case SLAVE_RTCIDLEMODE:
-//			case SLAVE_CMDIDLEMODE:
-//				dwLowPowerListenMode(&g_dwDev, 10000, 3000);
-//				EMU_EnterEM2(true);
-//				/*
-//				 * re-init some global vars
-//				 * */
-//				globalInit();
-//				break;
-//				//sleepAndRestore();
-//
-//			default:
-//				g_cur_mode = SLAVE_CMDIDLEMODE;
-//		}
 	}
 }
 

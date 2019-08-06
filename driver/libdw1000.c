@@ -426,7 +426,7 @@ void dwIdle(dwDevice_t* dev)
 }
 
 void dwNewReceive(dwDevice_t* dev) {
-	dwIdle(dev);
+	//dwIdle(dev);
 	memset(dev->sysctrl, 0, LEN_SYS_CTRL);
 	dwClearReceiveStatus(dev);
 	dev->deviceMode = RX_MODE;
@@ -652,33 +652,30 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 		//auto switch to receive state after a bad receive
 		//if double buffer is enable, switch to receive state after a good receive
 		//if double buffer and auto acknowledgment are enable, auto transmit acknowledgment and switch to receive state
-		dwSetReceiverAutoReenable(dev,false);
-		//set auto turn on receiver after a transmit
 		dwWaitForResponse(dev,true);
 		//set auto send acknowledgment after receive a frame with a acknowledgment request
 		dwSetAutoAck(dev,false);
-		//set 3us to transmit ACK after receive and 10us to turn on receiver after transmit
-		dwSetAckAndRespTime(dev, 3, 10);
 		//set CRC frame check
 		dwSuppressFrameCheck(dev, false);
 		//set receiver timeout turn-off time
 		dwSetReceiveWaitTimeout(dev,0);
 		//set active high for interrupt
 		dwSetInterruptPolarity(dev, true);
-		//for global frame filtering
-		dwSetFrameFilter(dev, true);
-		//for data frame (poll, poll_ack, range, range report, range failed) filtering
-		dwSetFrameFilterAllowData(dev, true);
-		//for reserved (blink) frame filtering
-		dwSetFrameFilterAllowReserved(dev, false);
-		//for MAC frame filtering
-		dwSetFrameFilterAllowMAC(dev, true);
-		//for BEACON frame filtering
-		dwSetFrameFilterAllowBeacon(dev, false);
-		//for ACK frame filtering
-		dwSetFrameFilterAllowAcknowledgement(dev, false);
-		//sub_node act as coordinator
-		dwSetFrameFilterBehaveCoordinator(dev, true);
+
+//		//for global frame filtering
+//		dwSetFrameFilter(dev, true);
+//		//for data frame (poll, poll_ack, range, range report, range failed) filtering
+//		dwSetFrameFilterAllowData(dev, true);
+//		//for reserved (blink) frame filtering
+//		dwSetFrameFilterAllowReserved(dev, false);
+//		//for MAC frame filtering
+//		dwSetFrameFilterAllowMAC(dev, true);
+//		//for BEACON frame filtering
+//		dwSetFrameFilterAllowBeacon(dev, false);
+//		//for ACK frame filtering
+//		dwSetFrameFilterAllowAcknowledgement(dev, false);
+//		//sub_node act as coordinator
+//		dwSetFrameFilterBehaveCoordinator(dev, true);
 
 		//interrupt active for complete transmit
 		dwInterruptOnSent(dev, true);
@@ -717,32 +714,27 @@ void dwSetSubNodeConfig(dwDevice_t* dev) {
 		//if double buffer is enable, switch to receive state after a good receive
 		//if double buffer and auto acknowledgment are enable, auto transmit acknowledgment and switch to receive state
 		dwSetReceiverAutoReenable(dev,false);
-		//set auto turn on receiver after a transmit
-		dwWaitForResponse(dev,true);
 		//set auto send acknowledgment after receive a frame with a acknowledgment request
 		dwSetAutoAck(dev,false);
-		//set 3us to transmit ACK after receive and 300us to turn on receiver after transmit
-		dwSetAckAndRespTime(dev, 3, 30);
 		//set CRC frame check
 		dwSuppressFrameCheck(dev, false);
 		//set receiver timeout turn-off time
-		dwSetReceiveWaitTimeout(dev,0);
+		//dwSetReceiveWaitTimeout(dev,0);
 
 		//for global frame filtering
-		dwSetFrameFilter(dev, true);
-		//for data frame (poll, poll_ack, range, range report, range failed) filtering
-		dwSetFrameFilterAllowData(dev, true);
-		//for reserved (blink) frame filtering
-		dwSetFrameFilterAllowReserved(dev, false);
-		//for MAC frame filtering
-		dwSetFrameFilterAllowMAC(dev, true);
-		//for BEACON frame filtering
-		dwSetFrameFilterAllowBeacon(dev, false);
-		//for ACK frame filtering
-		dwSetFrameFilterAllowAcknowledgement(dev, false);
-		//sub_node act as coordinator
-		dwSetFrameFilterBehaveCoordinator(dev, false);
-
+//		dwSetFrameFilter(dev, true);
+//		//for data frame (poll, poll_ack, range, range report, range failed) filtering
+//		dwSetFrameFilterAllowData(dev, true);
+//		//for reserved (blink) frame filtering
+//		dwSetFrameFilterAllowReserved(dev, false);
+//		//for MAC frame filtering
+//		dwSetFrameFilterAllowMAC(dev, true);
+//		//for BEACON frame filtering
+//		dwSetFrameFilterAllowBeacon(dev, false);
+//		//for ACK frame filtering
+//		dwSetFrameFilterAllowAcknowledgement(dev, false);
+//		//sub_node act as coordinator
+//		dwSetFrameFilterBehaveCoordinator(dev, false);
 
 		dwInterruptOnSent(dev, true);
 		dwInterruptOnReceived(dev, true);
@@ -1519,6 +1511,59 @@ static void readBytesOTP(dwDevice_t* dev, uint16_t address, uint8_t data[]) {
 	dwSpiWrite8(dev, OTP_IF, OTP_CTRL_SUB, 0x00);
 }
 
+void dwSetSleep(dwDevice_t *dev){
+
+	uint8_t pmsc_ctrl1[4];
+	uint8_t aon_wcfg[2];
+	uint8_t aon_cfg0[4];
+	uint8_t aon_cfg1[2];
+	uint8_t aon_ctrl[1];
+	aon_ctrl[0] = 0x00;
+	dwSpiWrite(dev, AON, AON_CTRL_SUB, aon_ctrl, LEN_AON_CTRL); //reset AON_CTRL
+	Delay_ms(1);
+
+	dwSpiRead(dev, PMSC, PMSC_CTRL1_SUB, pmsc_ctrl1, LEN_PMSC_CTRL1);
+	Delay_ms(1);
+	dwSpiRead(dev, AON, AON_CFG0_SUB, aon_cfg0, LEN_AON_CFG0);
+	Delay_ms(1);
+	dwSpiRead(dev, AON, AON_WCFG_SUB, aon_wcfg, LEN_AON_WCFG);
+	Delay_ms(1);
+
+//	setBit(pmsc_ctrl1, LEN_PMSC_CTRL1, ATXSLP, true);
+//	dwSpiWrite(dev, PMSC, PMSC_CTRL1_SUB, pmsc_ctrl1, LEN_PMSC_CTRL1);
+
+	memset(aon_cfg1, 0x00, 2);
+	dwSpiWrite(dev, AON, AON_CFG1_SUB, aon_cfg1, LEN_AON_CFG1); //clear AON_CFG1
+
+//	dwClearInterrupts(dev);
+//	dwWriteSystemEventMaskRegister(dev); //set interrupt when device waked up
+
+	setBit(aon_wcfg, LEN_AON_WCFG, ONW_RX, false);
+	setBit(aon_wcfg, LEN_AON_WCFG, ONW_LDC, false);
+	setBit(aon_wcfg, LEN_AON_WCFG, ONW_LLDO0, false);
+	dwSpiWrite(dev, AON, AON_WCFG_SUB, aon_wcfg, LEN_AON_WCFG); //Configure WCFG
+
+	setBit(aon_cfg0, LEN_AON_CFG0, SLEEP_EN, true);
+	setBit(aon_cfg0, LEN_AON_CFG0, WAKE_PIN, true);
+	setBit(aon_cfg0, LEN_AON_CFG0, WAKE_SPI, false);
+	setBit(aon_cfg0, LEN_AON_CFG0, WAKE_CNT, false);
+	dwSpiWrite(dev, AON, AON_CFG0_SUB, aon_cfg0, LEN_AON_CFG0); //Configure CFG0
+
+	setBit(aon_ctrl, LEN_AON_CTRL, UPL_CFG, true);
+	setBit(aon_ctrl, LEN_AON_CTRL, SAVE, true);
+	setBit(aon_ctrl, LEN_AON_CTRL, RESTORE, false);
+	dwSpiWrite(dev, AON, AON_CTRL_SUB, aon_ctrl, LEN_AON_CTRL); //Enter Sleep
+}
+
+void dwRetoreConfigFromAON(dwDevice_t *dev){
+	uint8_t aon_ctrl[1] = {};
+	dwSpiRead(dev, AON, AON_CTRL_SUB, aon_ctrl, 1);
+	setBit(aon_ctrl, LEN_AON_CTRL, UPL_CFG, false);
+	setBit(aon_ctrl, LEN_AON_CTRL, SAVE, false);
+	setBit(aon_ctrl, LEN_AON_CTRL, RESTORE, true);
+	dwSpiWrite(dev, AON, AON_CTRL_SUB, aon_ctrl, 1);
+}
+
 void dwSetAfterRxAutoSleep(dwDevice_t *dev){
     uint32_t pmsc_ctrl1;
     pmsc_ctrl1 = 0x81023738; //EN ARXSLP,EN SNPOZE
@@ -1661,7 +1706,9 @@ void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len)
 {
 	dwNewTransmit(dev);
 	dwSetData(dev, data, len);
+	dwWaitForResponse(dev,true); //set auto turn on receiver after a transmit
 	dwStartTransmit(dev);
+	dwSetAckAndRespTime(dev, 3, 500); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
 }
 
 /*
@@ -1673,8 +1720,30 @@ void dwRecvData(dwDevice_t *dev)
 
 	memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
 	len = dwGetDataLength(dev);
-	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
-	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
-	enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
-	g_dataRecvDone = true;
+
+//	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
+//	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
+
+	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
+
+	if ((g_recvSlaveFr.frameCtrl & 0x07) == SLAVE_IDNUM){
+		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
+		g_dataRecvDone = true;
+	}
+	else{
+		dwNewReceive(dev);
+		dwStartReceive(dev);
+		g_dataRecvDone = false;
+	}
+
+}
+
+void dwSentData(dwDevice_t *dev)
+{
+	;
+}
+
+void dwReceiveFailed(dwDevice_t *dev)
+{
+	;
 }

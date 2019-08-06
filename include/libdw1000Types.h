@@ -89,15 +89,26 @@ typedef struct dwDevice_s {
   bool forceTxPower;
 } dwDevice_t;
 
+//typedef struct dwFrame_s {
+//	uint8_t frameControlHigh;
+//	uint8_t frameControlLow;
+//	uint8_t  seqNum;
+//	uint16_t DestPanID;
+//	uint16_t DestAddr;
+//	uint16_t SourcePanID;
+//	uint16_t SourceAddr;
+//	uint8_t  Payload[113];
+//} __attribute__((packed)) dwMacFrame_t;
+
 typedef struct dwFrame_s {
-	uint8_t frameControlHigh;
-	uint8_t frameControlLow;
-	uint8_t  seqNum;
-	uint16_t DestPanID;
-	uint16_t DestAddr;
-	uint16_t SourcePanID;
-	uint16_t SourceAddr;
 	uint8_t  Payload[113];
+	uint16_t SourceAddr;
+	uint16_t SourcePanID;
+	uint16_t DestAddr;
+	uint16_t DestPanID;
+	uint8_t  seqNum;
+	uint8_t frameControlLow;
+	uint8_t frameControlHigh;
 } __attribute__((packed)) dwMacFrame_t;
 
 #define dwSpiSpeedLow    1000000

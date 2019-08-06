@@ -137,7 +137,9 @@
 // system event mask register
 // NOTE: uses the bit definitions of SYS_STATUS (below 32)
 #define SYS_MASK 0x0E
-#define LEN_SYS_MASK 4
+#define LEN_SYS_MASK  4
+#define CLKLOCK_BIT   1
+#define SLP2INIT_BIT  23
 
 // system time counter
 #define SYS_TIME 0x06
@@ -287,15 +289,39 @@
 // AON_CFG0 (sleep time setting)
 #define AON			 0x2C
 #define AON_WCFG_SUB 0x00
+#define LEN_AON_WCFG 4
+#define ONW_RX	 	 1
+#define ONW_LDC	 	 6
+#define PRES_SLEEP	 8
+#define ONW_LLDE	 11
+#define ONW_LLDO0	 12
+
+#define AON_CTRL_SUB 0x02
+#define LEN_AON_CTRL 1
+#define RESTORE	 	 0
+#define SAVE	 	 1
+#define UPL_CFG	 	 2
+
+
 #define AON_CFG0_SUB 0x06
 #define LEN_AON_CFG0 4
 #define SLEEP_EN	 0
+#define WAKE_PIN	 1
+#define WAKE_SPI	 2
+#define WAKE_CNT	 3
+
+#define AON_CFG1_SUB 0x0A
+#define LEN_AON_CFG1 2
+#define SLEEP_CEN	 0
+#define SMXX	 	 1
+#define LPOSC_CAL	 2
 
 // PMSC
 #define PMSC 0x36
 #define PMSC_CTRL0_SUB 0x00
 #define LEN_PMSC_CTRL0 4
 #define PMSC_CTRL1_SUB 0x04
+#define LEN_PMSC_CTRL1 4
 #define ATXSLP 11
 #define ARXSLP 12
 #define SNOZE  13

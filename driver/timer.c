@@ -12,7 +12,7 @@
 // Freq = 25M
 #define TOP 25000
 #define MS_COUNT  3125  //25000000 / 8 / 1000
-#define MAX_MS    20    //65535 / MS_COUNT
+#define MAX_MS    20    //65535 / MS_COUNT for sleep time
 
 volatile bool Timer1_overflow;
 /**************************************************************************//**
@@ -70,7 +70,7 @@ void setupTimer0(void)
 
 	/* Set TIMER Top value */
 	//TIMER_TopSet(TIMER0, TOP);
-	TIMER_TopSet(TIMER0, MS_COUNT * 10); //10 ms
+	TIMER_TopSet(TIMER0, MS_COUNT); //1 ms
 
 	/* Configure TIMER */
 	TIMER_Init(TIMER0, &timerInit);

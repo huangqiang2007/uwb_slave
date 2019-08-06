@@ -11,18 +11,18 @@ volatile uint32_t g_Ticks;
  * during the below timeout duration, the system enters into
  * sleep mode.
  *
- * 100 * 10ms = 1s
+ * 500 * 1ms = 10s
  * */
-#define IDLE_WKUP_TIMEOUT 100
+#define IDLE_WKUP_TIMEOUT 200
 volatile uint32_t g_idle_wkup_timeout;
 
 /*
  * when it does not receive cmd in below duration since the last command,
  * the system enters into sleep mode.
  *
- * 30000 * 10ms = 5 minutes
+ * 300000 * 1ms = 5 minutes
  * */
-#define IDLE_CMD_TIMEOUT 30000
+#define IDLE_CMD_TIMEOUT 300000
 volatile uint32_t g_idle_cmd_timeout;
 
 extern void setupTimer0(void);
