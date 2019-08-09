@@ -22,7 +22,7 @@ volatile uint32_t g_idle_wkup_timeout;
  *
  * 300000 * 1ms = 5 minutes
  * */
-#define IDLE_CMD_TIMEOUT 300000
+#define IDLE_CMD_TIMEOUT 300000 //300 second
 volatile uint32_t g_idle_cmd_timeout;
 
 extern void setupTimer0(void);
