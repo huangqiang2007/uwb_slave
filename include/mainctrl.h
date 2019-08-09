@@ -107,6 +107,8 @@ bool g_received_cmd;
 
 bool g_dataRecvDone;
 
+bool g_AD_start;
+
 extern void globalInit(void);
 extern void sleepAndRestore(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);

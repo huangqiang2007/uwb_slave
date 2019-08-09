@@ -11,7 +11,7 @@ volatile uint32_t g_Ticks;
  * during the below timeout duration, the system enters into
  * sleep mode.
  *
- * 500 * 1ms = 10s
+ * 200 * 1ms = 200ms
  * */
 #define IDLE_WKUP_TIMEOUT 200
 volatile uint32_t g_idle_wkup_timeout;

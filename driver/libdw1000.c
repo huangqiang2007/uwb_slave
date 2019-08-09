@@ -94,7 +94,7 @@ void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 
 	// Dummy callback handlers
 	dev->handleSent = dummy;
-	dev->handleReceiveFailed = dummy;
+	dev->handleReceiveFailed = dwReceiveFailed;
 
 	/*
 	 * data receive callback
@@ -720,6 +720,7 @@ void dwSetSubNodeConfig(dwDevice_t* dev) {
 		dwSuppressFrameCheck(dev, false);
 		//set receiver timeout turn-off time
 		//dwSetReceiveWaitTimeout(dev,0);
+		dwSetInterruptPolarity(dev, true);
 
 		//for global frame filtering
 //		dwSetFrameFilter(dev, true);
@@ -1386,10 +1387,10 @@ void dwHandleInterrupt(dwDevice_t *dev)
 		dwClearTransmitStatus(dev);
 		(*dev->handleSent)(dev);
 	}
-	if(dwIsReceiveTimestampAvailable(dev) && _handleReceiveTimestampAvailable != 0) {
-		dwClearReceiveTimestampAvailableStatus(dev);
-		(*_handleReceiveTimestampAvailable)();
-	}
+//	if(dwIsReceiveTimestampAvailable(dev) && _handleReceiveTimestampAvailable != 0) {
+//		dwClearReceiveTimestampAvailableStatus(dev);
+//		(*_handleReceiveTimestampAvailable)();
+//	}
 	if(dwIsReceiveFailed(dev)) {
 		dwClearReceiveStatus(dev);
 		dwRxSoftReset(dev); // Needed due to error in the RX auto-re-enable functionality. See page 35 of DW1000 manual, v2.13.
@@ -1400,16 +1401,16 @@ void dwHandleInterrupt(dwDevice_t *dev)
 				dwStartReceive(dev);
 			}
 		}
-	} else if(dwIsReceiveTimeout(dev)) {
-		dwClearReceiveStatus(dev);
-		dwRxSoftReset(dev); // Needed due to error in the RX auto-re-enable functionality. See page 35 of DW1000 manual, v2.13.
-		if(dev->handleReceiveTimeout != 0) {
-			(*dev->handleReceiveTimeout)(dev);
-			if(dev->permanentReceive) {
-				dwNewReceive(dev);
-				dwStartReceive(dev);
-			}
-		}
+//	} else if(dwIsReceiveTimeout(dev)) {
+//		dwClearReceiveStatus(dev);
+//		dwRxSoftReset(dev); // Needed due to error in the RX auto-re-enable functionality. See page 35 of DW1000 manual, v2.13.
+//		if(dev->handleReceiveTimeout != 0) {
+//			(*dev->handleReceiveTimeout)(dev);
+//			if(dev->permanentReceive) {
+//				dwNewReceive(dev);
+//				dwStartReceive(dev);
+//			}
+//		}
 	} else if(dwIsReceiveDone(dev) && dev->handleReceived != 0) {
 		dwClearReceiveStatus(dev);
 		(*dev->handleReceived)(dev);
@@ -1708,12 +1709,17 @@ void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len)
 	dwSetData(dev, data, len);
 	dwWaitForResponse(dev,true); //set auto turn on receiver after a transmit
 	dwStartTransmit(dev);
-	dwSetAckAndRespTime(dev, 3, 500); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
+	dwSetAckAndRespTime(dev, 3, 5); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
+//	dwIdle(dev);
+//	dwNewReceive(dev);
+//	dwStartReceive(dev);
 }
 
 /*
  * receive data from slave
  * */
+//volatile int g_cnt = 0;
+
 void dwRecvData(dwDevice_t *dev)
 {
 	int len = 0;
@@ -1726,16 +1732,18 @@ void dwRecvData(dwDevice_t *dev)
 
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
-	if ((g_recvSlaveFr.frameCtrl & 0x07) == SLAVE_IDNUM){
+	if (((g_recvSlaveFr.frameCtrl & 0x07) == SLAVE_IDNUM) && ((g_recvSlaveFr.frameCtrl & 0x80) == 0)){
 		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
 		g_dataRecvDone = true;
+//		if(g_recvSlaveFr.frameType == 0x03){
+//			g_cnt += 1;
+//		}
 	}
 	else{
 		dwNewReceive(dev);
 		dwStartReceive(dev);
 		g_dataRecvDone = false;
 	}
-
 }
 
 void dwSentData(dwDevice_t *dev)
@@ -1746,4 +1754,7 @@ void dwSentData(dwDevice_t *dev)
 void dwReceiveFailed(dwDevice_t *dev)
 {
 	;
+	dwNewReceive(dev);
+	dwStartReceive(dev);
+	g_dataRecvDone = false;
 }

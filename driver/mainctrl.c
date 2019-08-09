@@ -42,10 +42,11 @@ void sleepAndRestore(void)
 	 * reenable RTC
 	 * */
 	dwIdle(&g_dwDev);
+	Delay_ms(2);
 	dwSetSleep(&g_dwDev);
-	Delay_ms(1);
+	Delay_ms(2);
 	RTC_CounterReset();
-	//CMU->OSCENCMD |= 0x08;
+	Delay_ms(2);
 	EMU_EnterEM2(true);
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 1);
 	Delay_ms(2);
@@ -55,8 +56,9 @@ void sleepAndRestore(void)
 	 * */
 	globalInit();
 	dwDeviceInit(&g_dwDev);
+	Delay_ms(2);
 	UDELAY_Calibrate();
-	Delay_ms(1);
+	Delay_ms(2);
 	/*
 	 * reset g_idle_wkup_timeout duration upon bootup.
 	 * */
@@ -122,6 +124,10 @@ void enqueueFrame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *
 	memcpy((uint8_t *)&(frameQueue->packets[frameQueue->p_in++]),
 		(uint8_t *)mainCtrlFr, sizeof(struct MainCtrlFrame));
 
+	if (frameQueue->p_in == Q_LEN)
+		frameQueue->p_in = 0;
+
+
 	frameQueue->len++;
 
 	/*
@@ -139,6 +145,9 @@ struct MainCtrlFrame *dequeueFrame(struct ReceivedPacketQueue *frameQueue)
 		return NULL;
 
 	pmainCtrlFrame = (struct MainCtrlFrame *)&(frameQueue->packets[frameQueue->p_out++]);
+
+	if (frameQueue->p_out == Q_LEN)
+		frameQueue->p_out = 0;
 
 	CORE_CriticalDisableIrq();
 	frameQueue->len--;
@@ -226,6 +235,8 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
 }
 
+int p_cnt=0;
+
 int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 {
 	struct MainCtrlFrame *pMainCtrlFrame = NULL;
@@ -236,10 +247,16 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 		return ret;
 	else
 		ret = 0;
-
+//	if (pMainCtrlFrame->frameType == 0x03){
+//		p_cnt += 1;
+//	}
 	switch (pMainCtrlFrame->frameType)
 	{
 		case ENUM_SAMPLE_SET:
+			if (!g_AD_start){
+				g_AD_start = true;
+				powerADandUWB(1);
+			}
 			form_sample_set_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
@@ -252,6 +269,8 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 			break;
 
 		case ENUM_SLAVE_SLEEP:
+			g_AD_start = false;
+			powerADandUWB(0);
 			form_sleep_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 

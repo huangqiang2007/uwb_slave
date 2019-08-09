@@ -63,22 +63,25 @@ void rtc_test(void)
 	}
 }
 
-int main1(void)
-{
-	/* Chip errata */
-	CHIP_Init();
-
-	clockConfig();
-
-	timer_init();
-	Delay_ms(8000);
-
-	rtc_test();
-}
-
+//int main1(void)
+//{
+//	/* Chip errata */
+//	CHIP_Init();
+//
+//	clockConfig();
+//
+//	timer_init();
+//	Delay_ms(8000);
+//
+//	rtc_test();
+//}
+//extern volatile int g_cnt;
+//extern int p_cnt;
 int main(void)
 {
 
+//	uint32_t l_cnt = 0;
+//	uint32_t m_cnt = 0;
 
 	/* Chip errata */
 	CHIP_Init();
@@ -97,15 +100,14 @@ int main(void)
 	 * power up UWB, power down AD
 	 * */
 	powerADandUWB(0);
+	g_AD_start = false;
 
 	/*
 	 * config timer0 and timer1
 	 * */
 	timer_init();
 	Delay_ms(5);
-	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 0);
-	Delay_ms(5);
-	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 1);
+
 	/*
 	 * RS422 Uart init for delivering converted data
 	 * */
@@ -133,6 +135,11 @@ int main(void)
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 1);
 	Delay_ms(2);
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 0);
+
+	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 0);
+	Delay_ms(5);
+	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 1);
+
 	dwDeviceInit(&g_dwDev);
 
 	UDELAY_Calibrate();
@@ -145,6 +152,10 @@ int main(void)
 	dwStartReceive(&g_dwDev);
 
 	while (1) {
+
+//		l_cnt = g_cnt;
+//		m_cnt = p_cnt;
+
 		ADCPoll();
 		switch (g_cur_mode)
 		{
@@ -163,8 +174,11 @@ int main(void)
 				 * during 'g_idle_cmd_timeout' time window. The system will enter into
 				 * EM2 mode.
 				 * */
-				if (g_received_cmd && g_Ticks > g_idle_cmd_timeout)
+				if (g_received_cmd && g_Ticks > g_idle_cmd_timeout){
 					g_cur_mode = SLAVE_CMDIDLEMODE;
+					g_AD_start = false;
+					powerADandUWB(0);
+				}
 
 				break;
 
