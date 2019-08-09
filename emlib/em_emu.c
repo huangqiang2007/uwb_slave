@@ -663,8 +663,7 @@ void EMU_EnterEM2(bool restore)
 #if defined(ERRATA_FIX_EMU_E110_ENABLE)
   CORE_CRITICAL_SECTION(ramWFI(); )
 #else
-  //__WFI();
-  __asm__ volatile ("wfi");
+  __WFI();
 #endif
   EMU_EM23PostsleepHook();
 
