@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include "libdw1000Types.h"
 
-#define Q_LEN 4
+#define Q_LEN 3
 
 enum {SLAVE_IDLEMODE = 0, SLAVE_RTCIDLEMODE, SLAVE_CMDIDLEMODE, SLAVE_SAMPLEMODE};
 
@@ -57,7 +57,8 @@ typedef struct {
 	uint16_t srcId;
 } devInfo_t;
 
-#define FRAME_DATA_LEN 5
+
+#define FRAME_DATA_LEN 64
 
 struct MainCtrlFrame {
 	uint8_t head0; //0x55

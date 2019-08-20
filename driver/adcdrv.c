@@ -8,6 +8,7 @@
 #include "dmactrl.h"
 #include "uartdrv.h"
 #include <stdbool.h>
+#include "libdw1000.h"
 
 /*
  * ADC sample clock
@@ -183,6 +184,41 @@ void ADCStart(void)
 	//ADC_Start(ADC0, adcStartScan);
 }
 
+#if 1
+void ADCPoll(void)
+{
+	static int8_t s_index = 0;
+	uint8_t *precvBuf = NULL;
+
+	if (SLAVE_IDNUM == 3 || SLAVE_IDNUM == 4) {
+		if (s_index > FRAME_DATA_LEN) {
+			s_index = 0;
+			g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
+			g_adcSampleDataQueue.in++;
+			if (g_adcSampleDataQueue.in == Q_LEN)
+				g_adcSampleDataQueue.in = 0;
+		}
+	} else {
+		g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
+		g_adcSampleDataQueue.in++;
+		if (g_adcSampleDataQueue.in == Q_LEN)
+			g_adcSampleDataQueue.in = 0;
+	}
+	precvBuf = &(g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[0]);
+
+	// Start ADC conversion
+	ADC_Start(ADC0, adcStartSingle);
+
+	// Wait for conversion to be complete
+	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK));
+
+	// Get ADC result
+	if (SLAVE_IDNUM == 3 || SLAVE_IDNUM == 4)
+		precvBuf[s_index++] = ADC_DataSingleGet(ADC0);
+	else
+		precvBuf[0] = ADC_DataSingleGet(ADC0);
+}
+#else
 void ADCPoll(void)
 {
 	uint8_t *precvBuf = NULL;
@@ -203,3 +239,4 @@ void ADCPoll(void)
 	// Get ADC result
 	precvBuf[0] = ADC_DataSingleGet(ADC0);
 }
+#endif
