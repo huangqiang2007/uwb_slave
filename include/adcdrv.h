@@ -36,5 +36,6 @@ AdcSampleDataQueueDef g_adcSampleDataQueue;
 extern void ADCStart(void);
 extern void initADC(void);
 extern void ADCPoll(void);
+ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue);
 
 #endif /* ADCDRV_H_ */

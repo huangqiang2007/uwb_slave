@@ -10,10 +10,12 @@
 #include <stdbool.h>
 #include "libdw1000.h"
 
+#define ADC_DMA_ENABLE 0
+
 /*
  * ADC sample clock
  * */
-#define ADC_CLK_1M 5000
+#define ADC_CLK 80000
 
 /*
  * drop several samples before ADC is stable.
@@ -21,6 +23,72 @@
 #define ADC_IGNORE_CNT 5
 
 DMA_CB_TypeDef dma_adc_cb;
+
+bool sampleQueueFull(AdcSampleDataQueueDef *adcSampleDataQueue)
+{
+	if (adcSampleDataQueue->samples == Q_LEN)
+		return true;
+	else
+		return false;
+}
+
+bool sampleQueueEmpty(AdcSampleDataQueueDef *adcSampleDataQueue)
+{
+	if (adcSampleDataQueue->samples == 0)
+		return true;
+	else
+		return false;
+}
+
+void enqueueSample(AdcSampleDataQueueDef *adcSampleDataQueue, ADC_SAMPLE_BUFFERDef *sampleBuf)
+{
+	if (sampleQueueFull(adcSampleDataQueue))
+		return;
+
+	memcpy((uint8_t *)&(adcSampleDataQueue->adc_smaple_data[adcSampleDataQueue->in++]),
+		(uint8_t *)sampleBuf, sizeof(ADC_SAMPLE_BUFFERDef));
+
+	if (adcSampleDataQueue->in == Q_LEN)
+		adcSampleDataQueue->in = 0;
+
+	adcSampleDataQueue->samples++;
+
+	/*
+	 * update state machine
+	 * */
+	g_received_cmd = true;
+	g_cur_mode = SLAVE_SAMPLEMODE;
+}
+
+ADC_SAMPLE_BUFFERDef *getSampelInputbuf(AdcSampleDataQueueDef *adcSampleDataQueue)
+{
+	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+
+	if (sampleQueueFull(adcSampleDataQueue))
+		return NULL;
+
+	pSampleBuf = (ADC_SAMPLE_BUFFERDef *)&adcSampleDataQueue->adc_smaple_data[adcSampleDataQueue->in];
+
+	return pSampleBuf;
+}
+
+ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue)
+{
+	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+
+	if (sampleQueueEmpty(adcSampleDataQueue))
+		return NULL;
+
+	pSampleBuf = (ADC_SAMPLE_BUFFERDef *)&adcSampleDataQueue->adc_smaple_data[adcSampleDataQueue->out++];
+	if (adcSampleDataQueue->out == Q_LEN)
+		adcSampleDataQueue->out = 0;
+
+	CORE_CriticalDisableIrq();
+	adcSampleDataQueue->samples--;
+	CORE_CriticalEnableIrq();
+
+	return pSampleBuf;
+}
 
 void initADC (void)
 {
@@ -32,11 +100,11 @@ void initADC (void)
 	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
 
 	// Modify init structs and initialize
-	init.prescale = ADC_PrescaleCalc(ADC_CLK_1M, 0); // Init to max ADC clock for Series 0
+	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
 
 	initSingle.diff       = false;        // single ended
 	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
-	initSingle.resolution = adcRes8Bit;  // 12-bit resolution
+	initSingle.resolution = adcRes8Bit;   // 8-bit resolution
 
 	// Select ADC input. See README for corresponding EXP header pin.
 	initSingle.input = adcSingleInputCh4;
@@ -44,8 +112,59 @@ void initADC (void)
 
 	ADC_Init(ADC0, &init);
 	ADC_InitSingle(ADC0, &initSingle);
+
+	// Enable ADC Single Conversion Complete interrupt
+	ADC_IntEnable(ADC0, ADC_IEN_SINGLE);
+
+	// Enable ADC interrupts
+	NVIC_ClearPendingIRQ(ADC0_IRQn);
+	NVIC_EnableIRQ(ADC0_IRQn);
+
+	ADC_Start(ADC0, adcStartSingle);
 }
 
+void readADC(void)
+{
+	static int8_t s_index = 0;
+	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+	uint8_t *precvBuf = NULL;
+
+	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
+	if (!pSampleBuf)
+		return;
+
+	precvBuf = &pSampleBuf->adc_sample_buffer[0];
+
+	if (SLAVE_IDNUM == 3 || SLAVE_IDNUM == 4) {
+		precvBuf[s_index++] = ADC_DataSingleGet(ADC0);
+		if (s_index >= FRAME_DATA_LEN) {
+			s_index = 0;
+			g_adcSampleDataQueue.samples++;
+			g_adcSampleDataQueue.in++;
+			if (g_adcSampleDataQueue.in == Q_LEN)
+				g_adcSampleDataQueue.in = 0;
+		}
+	} else {
+		precvBuf[0] = ADC_DataSingleGet(ADC0);
+		g_adcSampleDataQueue.samples++;
+		g_adcSampleDataQueue.in++;
+		if (g_adcSampleDataQueue.in == Q_LEN)
+			g_adcSampleDataQueue.in = 0;
+	}
+}
+
+void ADC0_IRQHandler(void)
+{
+	// Clear the interrupt flag
+	ADC_IntClear(ADC0, ADC_IFC_SINGLE);
+
+	readADC();
+
+	// Start next ADC conversion
+	ADC_Start(ADC0, adcStartSingle);
+}
+
+#if ADC_DMA_ENABLE
 /*
  * @brief
  *   Configure ADC for scan mode.
@@ -183,6 +302,7 @@ void ADCStart(void)
 	 * */
 	//ADC_Start(ADC0, adcStartScan);
 }
+#endif
 
 #if 1
 void ADCPoll(void)
