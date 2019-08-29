@@ -187,9 +187,6 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint16_t data_crc;
 
-	//pMainCtrlFrame->frameCtrl &= ~(3 << 6);
-	//pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
-
 	pMainCtrlFrame->frameType = ENUM_SAMPLE_DATA_TOKEN;
 
 	pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
@@ -197,14 +194,8 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
 		pMainCtrlFrame->len = 0;
 	} else {
-		if (SLAVE_IDNUM == 3 || SLAVE_IDNUM == 4) {
-			memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
-			pMainCtrlFrame->len = FRAME_DATA_LEN;
-		} else {
-			memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
-			pMainCtrlFrame->data[0] = pSampleBuf->adc_sample_buffer[0];
-			pMainCtrlFrame->len = 1;
-		}
+		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
+		pMainCtrlFrame->len = FRAME_DATA_LEN;
 	}
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);

@@ -152,11 +152,6 @@ int main(void)
 	dwStartReceive(&g_dwDev);
 
 	while (1) {
-
-//		l_cnt = g_cnt;
-//		m_cnt = p_cnt;
-
-		ADCPoll();
 		switch (g_cur_mode)
 		{
 			case SLAVE_IDLEMODE:

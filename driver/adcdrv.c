@@ -133,19 +133,10 @@ void readADC(void)
 	if (!pSampleBuf)
 		return;
 
-	precvBuf = &pSampleBuf->adc_sample_buffer[0];
-
-	if (SLAVE_IDNUM == 3 || SLAVE_IDNUM == 4) {
-		precvBuf[s_index++] = ADC_DataSingleGet(ADC0);
-		if (s_index >= FRAME_DATA_LEN) {
-			s_index = 0;
-			g_adcSampleDataQueue.samples++;
-			g_adcSampleDataQueue.in++;
-			if (g_adcSampleDataQueue.in == Q_LEN)
-				g_adcSampleDataQueue.in = 0;
-		}
-	} else {
-		precvBuf[0] = ADC_DataSingleGet(ADC0);
+	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
+	precvBuf[s_index++] = ADC_DataSingleGet(ADC0);
+	if (s_index >= FRAME_DATA_LEN) {
+		s_index = 0;
 		g_adcSampleDataQueue.samples++;
 		g_adcSampleDataQueue.in++;
 		if (g_adcSampleDataQueue.in == Q_LEN)
