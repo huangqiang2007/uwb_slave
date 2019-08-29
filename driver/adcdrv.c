@@ -15,7 +15,7 @@
 /*
  * ADC sample clock
  * */
-#define ADC_CLK 80000
+#define ADC_CLK 360000
 
 /*
  * drop several samples before ADC is stable.
@@ -109,6 +109,7 @@ void initADC (void)
 	// Select ADC input. See README for corresponding EXP header pin.
 	initSingle.input = adcSingleInputCh4;
 	init.timebase = ADC_TimebaseCalc(0);
+	init.ovsRateSel = adcOvsRateSel8;
 
 	ADC_Init(ADC0, &init);
 	ADC_InitSingle(ADC0, &initSingle);
