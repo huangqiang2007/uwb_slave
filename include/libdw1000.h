@@ -29,7 +29,7 @@
 
 dwDevice_t g_dwDev;
 
-#define SLAVE_IDNUM 0x04
+#define SLAVE_IDNUM 0x03
 
 enum {PAN_ID1 = 0x0001, PAN_ID2};
 enum {SLAVE_ADDR1 = 0x0001, SLAVE_ADDR2, SLAVE_ADDR3, SLAVE_ADDR4};
@@ -229,7 +229,7 @@ void dwTxBufferFrameEncode(dwMacFrame_t* frame, bool isDataFrame, bool AckReques
  * */
 extern void dwDeviceInit(dwDevice_t *dev);
 
-void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len);
+void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_time_us);
 void dwRecvData(dwDevice_t *dev);
 void dwSentData(dwDevice_t *dev);
 void dwReceiveFailed(dwDevice_t *dev);

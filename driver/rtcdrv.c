@@ -7,7 +7,7 @@
 #include "em_gpio.h"
 #include "timer.h"
 
-#define DELAY_SECONDS 300.0
+#define DELAY_SECONDS 30.0
 #define LFXOFREQ      32768
 #define COMPARE_TOP   (DELAY_SECONDS * LFXOFREQ - 1)
 

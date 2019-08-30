@@ -1703,13 +1703,13 @@ void dwDeviceInit(dwDevice_t *dev)
 /*
  * send data to slave
  * */
-void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len)
+void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_time_us)
 {
 	dwNewTransmit(dev);
 	dwSetData(dev, data, len);
 	dwWaitForResponse(dev,true); //set auto turn on receiver after a transmit
 	dwStartTransmit(dev);
-	dwSetAckAndRespTime(dev, 3, 5); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
+	dwSetAckAndRespTime(dev, 3, resp_time_us); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
 //	dwIdle(dev);
 //	dwNewReceive(dev);
 //	dwStartReceive(dev);

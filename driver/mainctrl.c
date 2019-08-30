@@ -30,6 +30,7 @@ void globalInit(void)
 	g_device_id = g_devInfo.devId;
 	g_received_cmd = false;
 	g_cur_mode = SLAVE_IDLEMODE;
+	g_idle_cmd_timeout = g_Ticks + IDLE_CMD_TIMEOUT;
 	memset(&g_recvSlaveFr, 0x00, sizeof(g_recvSlaveFr));
 	memset(&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
 	memset(&g_dwMacFrameSend, 0x00, sizeof(g_dwMacFrameSend));
@@ -156,14 +157,14 @@ struct MainCtrlFrame *dequeueFrame(struct ReceivedPacketQueue *frameQueue)
 	return pmainCtrlFrame;
 }
 
-void sendTokenFrame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
+void sendTokenFrame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame, uint32_t resp_time_us)
 {
 //	uint16_t pan_id = PAN_ID1, source_addr = SLAVE_ADDR1, dest_addr = CENTER_ADDR1;
 //
 //	dwTxBufferFrameEncode(&g_dwMacFrameSend, 1, 0, pan_id, dest_addr,
 //		source_addr, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame));
 //	dwSendData(dev, (uint8_t *)dwMacFrame, sizeof(*dwMacFrame));
-	dwSendData(dev, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame));
+	dwSendData(dev, (uint8_t *)pMainCtrlFrame, sizeof(*pMainCtrlFrame), resp_time_us);
 }
 
 void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -179,7 +180,7 @@ void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, stru
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 5);
 }
 
 void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -202,7 +203,7 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 6500);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -218,7 +219,7 @@ void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, st
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 5);
 }
 
 void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -234,7 +235,7 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 5);
 }
 
 int p_cnt=0;
