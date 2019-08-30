@@ -105,6 +105,7 @@ void initADC (void)
 	initSingle.diff       = false;        // single ended
 	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
 	initSingle.resolution = adcRes8Bit;   // 8-bit resolution
+	initSingle.rep = true;
 
 	// Select ADC input. See README for corresponding EXP header pin.
 	initSingle.input = adcSingleInputCh4;
