@@ -6,6 +6,7 @@
 
 #define ADC_CHNL_NUM 1
 #define ADC_SAMPLE_BUFFER_NUM 10
+#define AD_Samples 50
 
 /*
  * one ADC sample buffer, the total buffer size 100 * 7 bytes

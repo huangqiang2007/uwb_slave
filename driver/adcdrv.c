@@ -9,13 +9,14 @@
 #include "uartdrv.h"
 #include <stdbool.h>
 #include "libdw1000.h"
+#include "timer.h"
 
-#define ADC_DMA_ENABLE 0
+#define ADC_DMA_ENABLE 1
 
 /*
  * ADC sample clock
  * */
-#define ADC_CLK 360000
+//#define ADC_CLK 1150000
 
 /*
  * drop several samples before ADC is stable.
@@ -23,6 +24,7 @@
 #define ADC_IGNORE_CNT 5
 
 DMA_CB_TypeDef dma_adc_cb;
+int ADC_CLK = 0;
 
 bool sampleQueueFull(AdcSampleDataQueueDef *adcSampleDataQueue)
 {
@@ -92,6 +94,7 @@ ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue)
 
 void initADC (void)
 {
+
 	// Enable ADC0 clock
 	CMU_ClockEnable(cmuClock_ADC0, true);
 
@@ -100,17 +103,29 @@ void initADC (void)
 	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
 
 	// Modify init structs and initialize
+	if (AD_Samples == 50){
+		ADC_CLK = 857600;
+		initSingle.acqTime = adcAcqTime256;
+		init.ovsRateSel = adcOvsRateSel64;
+	}
+	else if (AD_Samples == 5000){
+		ADC_CLK = 1320000;
+		initSingle.acqTime = adcAcqTime4;
+		init.ovsRateSel = adcOvsRateSel16;
+	}
 	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
+//	initSingle.acqTime = adcAcqTime16;
 
 	initSingle.diff       = false;        // single ended
-	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
-	initSingle.resolution = adcRes8Bit;   // 8-bit resolution
+	initSingle.reference  = adcRefVDD;    // internal 2.5V reference
+	initSingle.resolution = adcResOVS;   // 8-bit resolution
 	initSingle.rep = true;
 
 	// Select ADC input. See README for corresponding EXP header pin.
 	initSingle.input = adcSingleInputCh4;
 	init.timebase = ADC_TimebaseCalc(0);
-	init.ovsRateSel = adcOvsRateSel8;
+
+
 
 	ADC_Init(ADC0, &init);
 	ADC_InitSingle(ADC0, &initSingle);
@@ -134,9 +149,11 @@ void readADC(void)
 	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
 	if (!pSampleBuf)
 		return;
-
+	//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
+	//	temp = temp >> 7;
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-	precvBuf[s_index++] = ADC_DataSingleGet(ADC0);
+	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 7;
+
 	if (s_index >= FRAME_DATA_LEN) {
 		s_index = 0;
 		g_adcSampleDataQueue.samples++;
@@ -148,13 +165,29 @@ void readADC(void)
 
 void ADC0_IRQHandler(void)
 {
+//	static uint32_t t1 = 0, s_cnt = 0;
+//	uint16_t temp = 0;
+//
+//	if (t1 == 0)
+//		t1 = g_Ticks + 500;
+//
+//	s_cnt++;
+//
+//	if (g_Ticks == t1) {
+//		s_cnt = 0;
+//		t1 = g_Ticks + 500;
+//	}
+
 	// Clear the interrupt flag
 	ADC_IntClear(ADC0, ADC_IFC_SINGLE);
+
+//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
+//	temp = temp >> 7;
 
 	readADC();
 
 	// Start next ADC conversion
-	ADC_Start(ADC0, adcStartSingle);
+	//ADC_Start(ADC0, adcStartSingle);
 }
 
 #if ADC_DMA_ENABLE
@@ -173,7 +206,7 @@ void ADCConfig(void)
 	* Init common issues for both single conversion and scan mode
 	* */
 	init.timebase = ADC_TimebaseCalc(0);
-	init.prescale = ADC_PrescaleCalc(ADC_CLK_1M, 0);
+	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
 	init.ovsRateSel = _ADC_CTRL_OVSRSEL_X32;
 	ADC_Init(ADC0, &init);
 
@@ -297,7 +330,7 @@ void ADCStart(void)
 }
 #endif
 
-#if 1
+#if ADC_DMA_ENABLE
 void ADCPoll(void)
 {
 	static int8_t s_index = 0;

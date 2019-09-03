@@ -13,7 +13,7 @@ volatile uint32_t g_Ticks;
  *
  * 200 * 1ms = 200ms
  * */
-#define IDLE_WKUP_TIMEOUT 300
+#define IDLE_WKUP_TIMEOUT 250
 volatile uint32_t g_idle_wkup_timeout;
 
 /*

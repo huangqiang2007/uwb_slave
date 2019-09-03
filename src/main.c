@@ -123,6 +123,8 @@ int main(void)
 	 * config and start ADC via DMA
 	 * */
 	initADC();
+//	powerADandUWB(1);
+//	adc_test();
 
 	/*
 	 * init RTC for LFRCO 32.768KHz
