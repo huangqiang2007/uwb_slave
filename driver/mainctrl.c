@@ -204,7 +204,7 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 7000);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8000);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)

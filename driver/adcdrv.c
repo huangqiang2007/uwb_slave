@@ -117,7 +117,7 @@ void initADC (void)
 //	initSingle.acqTime = adcAcqTime16;
 
 	initSingle.diff       = false;        // single ended
-	initSingle.reference  = adcRefVDD;    // internal 2.5V reference
+	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
 	initSingle.resolution = adcResOVS;   // 8-bit resolution
 	initSingle.rep = true;
 
