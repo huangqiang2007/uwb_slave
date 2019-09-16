@@ -48,7 +48,36 @@ void sleepAndRestore(void)
 	Delay_ms(2);
 	RTC_CounterReset();
 	Delay_ms(2);
+
+	/*
+	 * chose HF RCO as clock source.
+	 * */
+	CMU_OscillatorEnable(cmuOsc_HFRCO, true, true);
+	CMU_ClockSelectSet(cmuClock_HF, cmuSelect_HFRCO);
+	CMU_OscillatorEnable(cmuOsc_HFXO, false, false);
+	/*
+	 * power down external crystal oscillator, OPA and reset.
+	 * */
+	powerADandUWB(0);
+	GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 0);
+	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 0);
+
+
 	EMU_EnterEM2(true);
+
+	/*
+	 * chose HF external crystal oscillator as clock source.
+	 * */
+	Delay_ms(1);
+	/*
+	 * power up external crystal oscillator.
+	 * */
+	GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
+	Delay_ms(5);
+	CMU_OscillatorEnable(cmuOsc_HFXO, true, true);
+	CMU_ClockSelectSet(cmuClock_HF, cmuSelect_HFXO);
+	CMU_OscillatorEnable(cmuOsc_HFRCO, false, false);
+	Delay_ms(5);
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 1);
 	Delay_ms(2);
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 0);
@@ -215,6 +244,7 @@ void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, st
 	//pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
 
 	pMainCtrlFrame->frameType = ENUM_SLAVE_STATUS_TOKEN;
+	pMainCtrlFrame->data[0] = g_cur_mode;
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
@@ -273,9 +303,9 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 			break;
 
 		case ENUM_SLAVE_SLEEP:
-			g_AD_start = false;
-			powerADandUWB(0);
 			form_sleep_token_frame(dev, dwMacFrame, pMainCtrlFrame);
+			g_AD_start = false;
+			g_cur_mode = SLAVE_RTCIDLEMODE;
 			break;
 
 		default:

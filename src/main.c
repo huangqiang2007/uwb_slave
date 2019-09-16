@@ -19,6 +19,14 @@
 
 void clockConfig(void)
 {
+	CMU_ClockEnable(cmuClock_GPIO, true);
+	CMU_ClockEnable(cmuClock_TIMER0, true);
+	CMU_ClockEnable(cmuClock_TIMER1, true);
+	timer_init();
+	Delay_ms(5);
+	GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
+	Delay_ms(5);
+
 	SystemCoreClockUpdate();
 
 	/*
@@ -26,7 +34,7 @@ void clockConfig(void)
 	 * */
 	CMU_OscillatorEnable(cmuOsc_HFXO, true, true);
 	CMU_ClockSelectSet(cmuClock_HF, cmuSelect_HFXO);
-	//CMU_OscillatorEnable(cmuOsc_HFRCO, false, false);
+	CMU_OscillatorEnable(cmuOsc_HFRCO, false, false);
 
 	CMU_ClockSelectSet(cmuClock_LFA, cmuSelect_ULFRCO);
 	CMU_OscillatorEnable(cmuSelect_ULFRCO, true, true);
@@ -119,6 +127,9 @@ int main(void)
 	 * */
 	SPIDMAInit();
 
+	UWB_Default.subnode_id = 2;
+	UWB_Default.AD_Samples = 50;
+
 	/*
 	 * config and start ADC via DMA
 	 * */
@@ -172,9 +183,8 @@ int main(void)
 				 * EM2 mode.
 				 * */
 				if (g_received_cmd && g_Ticks > g_idle_cmd_timeout){
-					g_cur_mode = SLAVE_CMDIDLEMODE;
 					g_AD_start = false;
-					powerADandUWB(0);
+					g_cur_mode = SLAVE_CMDIDLEMODE;
 				}
 
 				break;

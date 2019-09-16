@@ -27,6 +27,7 @@
 #include "mainctrl.h"
 #include "libdw1000.h"
 #include "dw1000.h"
+#include "main.h"
 
 static const uint8_t BIAS_500_16_ZERO = 10;
 static const uint8_t BIAS_500_64_ZERO = 8;
@@ -81,8 +82,8 @@ void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 	dev->pulseFrequency = TX_PULSE_FREQ_16MHZ;
 	dev->dataRate = TRX_RATE_6800KBPS;
 	dev->preambleLength = TX_PREAMBLE_LEN_128;
-	dev->preambleCode = PREAMBLE_CODE_16MHZ_4;
-	dev->channel = CHANNEL_5;
+	dev->preambleCode = PREAMBLE_CODE_16MHZ_2;
+	dev->channel = CHANNEL_1;
 	dev->smartPower = true;
 	dev->frameCheck = true;
 	dev->permanentReceive = false;
@@ -1732,7 +1733,7 @@ void dwRecvData(dwDevice_t *dev)
 
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
-	if (((g_recvSlaveFr.frameCtrl & 0x07) == SLAVE_IDNUM) && ((g_recvSlaveFr.frameCtrl & 0x80) == 0)){
+	if (((g_recvSlaveFr.frameCtrl & 0x07) == UWB_Default.subnode_id) && (((g_recvSlaveFr.frameCtrl & 0x80) == 0) || ((g_recvSlaveFr.frameCtrl & 0x80) == 1))){
 		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
 		g_dataRecvDone = true;
 //		if(g_recvSlaveFr.frameType == 0x03){

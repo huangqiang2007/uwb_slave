@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include "libdw1000.h"
 #include "timer.h"
+#include "main.h"
 
 #define ADC_DMA_ENABLE 1
 
@@ -103,12 +104,12 @@ void initADC (void)
 	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
 
 	// Modify init structs and initialize
-	if (AD_Samples == 50){
+	if (UWB_Default.AD_Samples == 50){
 		ADC_CLK = 857600;
 		initSingle.acqTime = adcAcqTime256;
 		init.ovsRateSel = adcOvsRateSel64;
 	}
-	else if (AD_Samples == 5000){
+	else if (UWB_Default.AD_Samples == 5000){
 		ADC_CLK = 1320000;
 		initSingle.acqTime = adcAcqTime4;
 		init.ovsRateSel = adcOvsRateSel16;
@@ -248,7 +249,7 @@ void DMA_ADC_callback(unsigned int channel, bool primary, void *user)
 	if (g_adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM)
 		g_adcSampleDataQueue.in = 0;
 
-	precvBuf = &(g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
+	precvBuf = (&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
 
 out:
 	/* Re-activate the DMA */
@@ -336,7 +337,7 @@ void ADCPoll(void)
 	static int8_t s_index = 0;
 	uint8_t *precvBuf = NULL;
 
-	if (SLAVE_IDNUM == 3 || SLAVE_IDNUM == 4) {
+	if (UWB_Default.subnode_id == 3 || UWB_Default.subnode_id == 4) {
 		if (s_index > FRAME_DATA_LEN) {
 			s_index = 0;
 			g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
@@ -359,7 +360,7 @@ void ADCPoll(void)
 	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK));
 
 	// Get ADC result
-	if (SLAVE_IDNUM == 3 || SLAVE_IDNUM == 4)
+	if (UWB_Default.subnode_id == 3 || UWB_Default.subnode_id == 4)
 		precvBuf[s_index++] = ADC_DataSingleGet(ADC0);
 	else
 		precvBuf[0] = ADC_DataSingleGet(ADC0);
