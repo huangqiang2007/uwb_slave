@@ -1664,7 +1664,6 @@ void GPIO_ODD_IRQHandler(void)
 	dwHandleInterrupt(&g_dwDev);
 }
 
-#define  gpioPortB_11 11
 //void dwGpioInterruptConfig(dwDevice_t *dev)
 //{
 //	CMU_ClockEnable(cmuClock_GPIO, true);

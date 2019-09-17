@@ -30,6 +30,7 @@
 dwDevice_t g_dwDev;
 
 #define SLAVE_IDNUM 0x01
+#define gpioPortB_11 11
 
 enum {PAN_ID1 = 0x0001, PAN_ID2};
 enum {SLAVE_ADDR1 = 0x0001, SLAVE_ADDR2, SLAVE_ADDR3, SLAVE_ADDR4};

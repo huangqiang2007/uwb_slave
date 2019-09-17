@@ -127,15 +127,13 @@ int main(void)
 	 * */
 	SPIDMAInit();
 
-	UWB_Default.subnode_id = 2;
-	UWB_Default.AD_Samples = 50;
+	UWB_Default.subnode_id = 3;
+	UWB_Default.AD_Samples = 5000;
 
 	/*
 	 * config and start ADC via DMA
 	 * */
 	initADC();
-//	powerADandUWB(1);
-//	adc_test();
 
 	/*
 	 * init RTC for LFRCO 32.768KHz

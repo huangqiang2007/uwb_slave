@@ -61,6 +61,7 @@ void sleepAndRestore(void)
 	powerADandUWB(0);
 	GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 0);
 	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 0);
+	GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 0);
 
 
 	EMU_EnterEM2(true);
@@ -81,14 +82,16 @@ void sleepAndRestore(void)
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 1);
 	Delay_ms(2);
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 0);
+	Delay_ms(2);
+	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 1);
 	/*
 	 * re-init some global vars
 	 * */
 	globalInit();
 	dwDeviceInit(&g_dwDev);
 	Delay_ms(2);
-	UDELAY_Calibrate();
-	Delay_ms(2);
+//	UDELAY_Calibrate();
+//	Delay_ms(2);
 	/*
 	 * reset g_idle_wkup_timeout duration upon bootup.
 	 * */
@@ -209,7 +212,7 @@ void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, stru
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 50);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 9000);
 }
 
 void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -233,7 +236,7 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8000);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 7500);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
