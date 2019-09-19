@@ -7,6 +7,8 @@
 #define ADC_CHNL_NUM 1
 #define ADC_SAMPLE_BUFFER_NUM 10
 
+volatile uint32_t g_batteryVol;
+
 /*
  * one ADC sample buffer, the total buffer size 100 * 7 bytes
  *
@@ -37,5 +39,6 @@ extern void ADCStart(void);
 extern void initADC(void);
 extern void ADCPoll(void);
 ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue);
+void pollADCForBattery (void);
 
 #endif /* ADCDRV_H_ */

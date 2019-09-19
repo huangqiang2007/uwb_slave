@@ -35,6 +35,8 @@ void globalInit(void)
 	memset(&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
 	memset(&g_dwMacFrameSend, 0x00, sizeof(g_dwMacFrameSend));
 	memset((void *)&g_dwDev, 0x00, sizeof(g_dwDev));
+
+	g_batteryVol = 0;
 }
 
 void sleepAndRestore(void)
@@ -229,6 +231,11 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	} else {
 		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
 		pMainCtrlFrame->len = FRAME_DATA_LEN;
+
+		/*
+		 * update sampled battery voltage
+		 * */
+		pMainCtrlFrame->frameCtrl |= (g_batteryVol & 0x0f) << 4;
 	}
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
