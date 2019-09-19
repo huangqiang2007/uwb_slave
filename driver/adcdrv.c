@@ -96,6 +96,7 @@ ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue)
 
 void initADC (void)
 {
+	ADC_Reset(ADC0);
 
 	// Enable ADC0 clock
 	CMU_ClockEnable(cmuClock_ADC0, true);
@@ -126,8 +127,6 @@ void initADC (void)
 	// Select ADC input. See README for corresponding EXP header pin.
 	initSingle.input = adcSingleInputCh4;
 	init.timebase = ADC_TimebaseCalc(0);
-
-
 
 	ADC_Init(ADC0, &init);
 	ADC_InitSingle(ADC0, &initSingle);
