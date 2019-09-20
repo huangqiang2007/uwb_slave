@@ -53,8 +53,12 @@ void clockConfig(void)
 
 void adc_test(void)
 {
-	while (1)
-		ADCPoll();
+	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+	powerADandUWB(1);
+	initADC();
+	while(1){
+		pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
+	}
 }
 
 void rtc_test(void)
@@ -117,22 +121,17 @@ int main(void)
 	Delay_ms(5);
 
 	/*
-	 * RS422 Uart init for delivering converted data
-	 * */
-	//uartSetup();
-
-	//powerADandUWB(1);
-	/*
 	 * SPI master config
 	 * */
 	SPIDMAInit();
 
-	UWB_Default.subnode_id = 3;
+	UWB_Default.subnode_id = 4;
 	UWB_Default.AD_Samples = 5000;
 
 	/*
-	 * config and start ADC via DMA
+	 * configure and start ADC via interrupt
 	 * */
+//	adc_test();
 	initADC();
 
 	/*
@@ -156,9 +155,11 @@ int main(void)
 	UDELAY_Calibrate();
 	Delay_ms(500);
 	/*
-	 * reset g_idle_wkup_timeout duration upon bootup.
+	 * reset g_idle_wkup_timeout and g_idle_bat_ad_time duration upon boot.
 	 * */
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
+	g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
+
 	dwNewReceive(&g_dwDev);
 	dwStartReceive(&g_dwDev);
 

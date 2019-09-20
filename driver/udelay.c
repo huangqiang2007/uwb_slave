@@ -142,7 +142,7 @@ void UDELAY_Calibrate(void)
   }
 #else
   rtcClkDiv = CMU_ClockDivGet(cmuClock_RTC);
-  CMU_ClockDivSet(cmuClock_RTC, cmuClkDiv_32768);
+  CMU_ClockDivSet(cmuClock_RTC, cmuClkDiv_256);
   if ( !(CMU->LFACLKEN0 & CMU_LFACLKEN0_RTC) ) {
     /* Enable clock to RTC module */
     CMU_ClockEnable(cmuClock_RTC, true);

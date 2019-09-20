@@ -112,12 +112,11 @@ void initADC (void)
 		init.ovsRateSel = adcOvsRateSel64;
 	}
 	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 1320000;
+		ADC_CLK = 1400000;
 		initSingle.acqTime = adcAcqTime4;
 		init.ovsRateSel = adcOvsRateSel16;
 	}
 	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
-//	initSingle.acqTime = adcAcqTime16;
 
 	initSingle.diff       = false;        // single ended
 	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
@@ -156,14 +155,15 @@ void pollADCForBattery (void)
 	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
 
 	// Modify init structs and initialize
-	init.prescale = ADC_PrescaleCalc(13000000, 0); // Init to max ADC clock for Series 0
+	init.prescale = ADC_PrescaleCalc(1000000, 0); // Init to max ADC clock for Series 0
 
 	initSingle.diff       = false;        // single ended
 	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
-	initSingle.resolution = adcRes12Bit;  // 12-bit resolution
+	initSingle.resolution = adcRes8Bit;  // 12-bit resolution
+	initSingle.acqTime = adcAcqTime4;
 
 	// Select ADC input. See README for corresponding EXP header pin.
-	initSingle.input = adcSingleInputCh6;
+	initSingle.input = adcSingleInputCh7;
 	init.timebase = ADC_TimebaseCalc(0);
 
 	ADC_Init(ADC0, &init);
@@ -177,10 +177,13 @@ void pollADCForBattery (void)
 
 	// Get ADC result
 	sample = ADC_DataSingleGet(ADC0);
-	vol = (float)(sample * 5.0 / 4096);
+	vol = (float)(sample * 5.0 / 256);
+
+	if (vol > 3.7) vol = 3.7;
+	else if (vol < 3.0) vol = 3.01;
 
 	if (vol > 3.0)
-		g_batteryVol = ((vol - 3.0) * 10 + 6) / 7;
+		g_batteryVol = ((vol - 3.0) * 100 + 6) / 7;
 
 	/*
 	 * re-init ADC for sensor sample
@@ -200,7 +203,7 @@ void readADC(void)
 	//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
 	//	temp = temp >> 7;
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 7;
+	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 8;
 
 	if (s_index >= FRAME_DATA_LEN) {
 		s_index = 0;
@@ -210,9 +213,12 @@ void readADC(void)
 			g_adcSampleDataQueue.in = 0;
 
 		/*
-		 * poll battery voltage
+		 * poll battery voltage every 1 second
 		 * */
-		pollADCForBattery();
+		if (g_Ticks > g_idle_bat_ad_time){
+			pollADCForBattery();
+			g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
+		}
 	}
 }
 

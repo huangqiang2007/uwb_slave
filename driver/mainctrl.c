@@ -37,6 +37,7 @@ void globalInit(void)
 	memset((void *)&g_dwDev, 0x00, sizeof(g_dwDev));
 
 	g_batteryVol = 0;
+	delay_us = 8000;
 }
 
 void sleepAndRestore(void)
@@ -101,6 +102,8 @@ void sleepAndRestore(void)
 	dwStartReceive(&g_dwDev);
 	g_Ticks = 0;
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
+	g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
+	delay_us = 8000;
 }
 
 /*
@@ -214,7 +217,7 @@ void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, stru
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 9000);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8000);
 }
 
 void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -228,6 +231,7 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	if (!pSampleBuf) {
 		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
 		pMainCtrlFrame->len = 0;
+		delay_us = 8000;
 	} else {
 		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
 		pMainCtrlFrame->len = FRAME_DATA_LEN;
@@ -235,15 +239,15 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 		/*
 		 * update sampled battery voltage
 		 * */
-		pMainCtrlFrame->frameCtrl |= (g_batteryVol & 0x0f) << 4;
+		pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
+		delay_us = 6500;
 	}
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 7500);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, delay_us);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -297,11 +301,11 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 	switch (pMainCtrlFrame->frameType)
 	{
 		case ENUM_SAMPLE_SET:
+			form_sample_set_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			if (!g_AD_start){
 				g_AD_start = true;
 				powerADandUWB(1);
 			}
-			form_sample_set_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
 		case ENUM_SAMPLE_DATA:

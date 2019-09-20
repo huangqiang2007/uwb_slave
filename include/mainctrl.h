@@ -110,6 +110,8 @@ bool g_dataRecvDone;
 
 bool g_AD_start;
 
+uint32_t delay_us;
+
 extern void globalInit(void);
 extern void sleepAndRestore(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
