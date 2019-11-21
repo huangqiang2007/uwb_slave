@@ -145,7 +145,8 @@ int main(void)
 	 * */
 //	adc_test();
 
-	initADC();
+	//initADC();
+	ADCConfigForScan();
 
 	/*
 	 * init RTC for LFRCO 32.768KHz

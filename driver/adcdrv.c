@@ -16,6 +16,21 @@
 #define ADC_DMA_ENABLE 1
 
 /*
+ * DMA channel for ADC Scan mode
+ * */
+#define DMA_CHANNEL 2
+
+/*
+ * Two ADC channel for Scan mode
+ * */
+#define SCAN_ADC_CHNL_NUM 2
+
+/*
+ * buffer for two ADC channels
+ * */
+static uint8_t g_primaryResultBuffer[2] = {0}, g_alterResultBuffer[2] = {0};
+
+/*
  * ADC sample clock
  * */
 //#define ADC_CLK 1150000
@@ -140,6 +155,198 @@ void initADC (void)
 
 	ADC_Start(ADC0, adcStartSingle);
 }
+
+/****************************************************************************/
+
+void collectSamples(uint8_t dataBuf[])
+{
+	static int8_t s_index = 0;
+	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+	uint8_t *precvBuf = NULL;
+
+	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
+	if (!pSampleBuf)
+		return;
+
+	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
+	precvBuf[s_index++] = dataBuf[0];
+
+	if (s_index >= FRAME_DATA_LEN) {
+		s_index = 0;
+		precvBuf = NULL;
+		g_adcSampleDataQueue.samples++;
+		g_adcSampleDataQueue.in++;
+		if (g_adcSampleDataQueue.in == Q_LEN)
+			g_adcSampleDataQueue.in = 0;
+
+		delay_us = 8000;
+
+		/*
+		 * poll battery voltage every 1 second
+		 * */
+		if (g_Ticks > g_idle_bat_ad_time){
+			//pollADCForBattery();
+
+			uint32_t sample;
+			float vol = 0.0;
+
+			// Get ADC result
+			sample = dataBuf[1];
+			vol = (float)(sample * 5.0 / 256);
+
+			if (vol > 3.7)
+				vol = 3.7;
+			else if (vol < 3.0)
+				vol = 3.01;
+
+			if (vol > 3.0)
+				g_batteryVol = ((vol - 3.0) * 100 + 6) / 7;
+
+			delay_us = 6500;
+			g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
+		}
+	}
+}
+
+void DMA_For_ADC_callback(unsigned int channel, bool primary, void *user)
+{
+	static uint8_t drop_cnt = 0;
+	uint8_t *precvBuf = NULL;
+
+	/*
+	 * drop first some samples since it's likely ADC
+	 * is unstable during warming up phase.
+	 * */
+	if (drop_cnt < ADC_IGNORE_CNT) {
+		drop_cnt++;
+		goto out;
+	}
+
+	if (primary == true) {
+		precvBuf = g_primaryResultBuffer;
+	} else {
+		precvBuf = g_alterResultBuffer;
+	}
+
+	collectSamples(precvBuf);
+
+out:
+	/* Re-activate the DMA */
+	DMA_RefreshPingPong(
+		channel,
+		primary,
+		false,
+		NULL,
+		NULL,
+		SCAN_ADC_CHNL_NUM - 1,
+		false);
+
+	ADC_Start(ADC0, adcStartScan);
+}
+
+/*
+ *@brief
+ *   Configure DMA usage for this application.
+ * */
+void DMAConfigForADC(void)
+{
+	DMA_CfgDescr_TypeDef descrCfg;
+	DMA_CfgChannel_TypeDef chnlCfg;
+
+	CMU_ClockEnable(cmuClock_DMA, true);
+
+	/*
+	* Configure DMA channel used
+	* */
+	dma_adc_cb.cbFunc = DMA_For_ADC_callback;
+	dma_adc_cb.userPtr = NULL;
+
+	chnlCfg.highPri = false;
+	chnlCfg.enableInt = true;
+	chnlCfg.select = DMAREQ_ADC0_SCAN;
+	chnlCfg.cb = &dma_adc_cb;
+	DMA_CfgChannel(DMA_CHANNEL, &chnlCfg);
+
+	/*
+	* one byte per transfer
+	* */
+	descrCfg.dstInc = dmaDataInc1;
+	descrCfg.srcInc = dmaDataIncNone;
+	descrCfg.size = dmaDataSize1;
+	descrCfg.arbRate = dmaArbitrate1;
+	descrCfg.hprot = 0;
+	DMA_CfgDescr(DMA_CHANNEL, true, &descrCfg);
+	DMA_CfgDescr(DMA_CHANNEL, false, &descrCfg);
+
+	// Start DMA
+	DMA_ActivatePingPong(
+		DMA_CHANNEL,
+		false,
+		(void *)&g_primaryResultBuffer, // primary destination
+		(void *)&(ADC0->SCANDATA), // primary source
+		SCAN_ADC_CHNL_NUM - 1,
+		(void *)&g_alterResultBuffer, // alternate destination
+		(void *)&(ADC0->SCANDATA), // alternate source
+		SCAN_ADC_CHNL_NUM - 1);
+}
+
+/*
+ * @brief
+ *   Configure ADC for scan mode.
+ * */
+void ADCConfigForScan(void)
+{
+	ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
+	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
+
+	ADC_Reset(ADC0);
+
+	CMU_ClockEnable(cmuClock_ADC0, true);
+
+	/*
+	* Init common issues for both single conversion and scan mode
+	* */
+	init.timebase = ADC_TimebaseCalc(0);
+	init.ovsRateSel = _ADC_CTRL_OVSRSEL_X32;
+
+	// Modify init structs and initialize
+	if (UWB_Default.AD_Samples == 50){
+		ADC_CLK = 857600;
+		scanInit.acqTime = adcAcqTime256;
+		init.ovsRateSel = adcOvsRateSel64;
+	}
+	else if (UWB_Default.AD_Samples == 5000){
+		ADC_CLK = 1260000;
+		scanInit.acqTime = adcAcqTime4;
+		init.ovsRateSel = adcOvsRateSel16;
+	}
+	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
+	init.lpfMode = adcLPFilterDeCap;
+	ADC_Init(ADC0, &init);
+
+	/*
+	* Init for scan sequence use: 7 AD sample channels
+	* */
+	scanInit.rep = false;
+	scanInit.diff = false;        // single ended
+	scanInit.resolution = adcResOVS;   // 8-bit resolution
+	scanInit.reference = adcRef2V5;
+	//scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
+	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4 | ADC_SCANCTRL_INPUTMASK_CH7;
+	ADC_InitScan(ADC0, &scanInit);
+
+	/*
+	 * DAM config for ADC
+	 * */
+	DMAConfigForADC();
+
+	/*
+	 * trigger ADC
+	 * */
+	ADC_Start(ADC0, adcStartScan);
+}
+
+/****************************************************************************/
 
 void pollADCForBattery (void)
 {
@@ -311,7 +518,7 @@ void DMA_ADC_callback(unsigned int channel, bool primary, void *user)
 	if (g_adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM)
 		g_adcSampleDataQueue.in = 0;
 
-	precvBuf = (&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
+	precvBuf = (uint8_t *)(&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
 
 out:
 	/* Re-activate the DMA */
