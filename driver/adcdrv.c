@@ -112,12 +112,12 @@ void initADC (void)
 		init.ovsRateSel = adcOvsRateSel64;
 	}
 	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 1400000;
+		ADC_CLK = 1260000;
 		initSingle.acqTime = adcAcqTime4;
 		init.ovsRateSel = adcOvsRateSel16;
 	}
 	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
-
+	init.lpfMode = adcLPFilterDeCap;
 	initSingle.diff       = false;        // single ended
 	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
 	initSingle.resolution = adcResOVS;   // 8-bit resolution
@@ -134,6 +134,7 @@ void initADC (void)
 	ADC_IntEnable(ADC0, ADC_IEN_SINGLE);
 
 	// Enable ADC interrupts
+	NVIC_SetPriority(ADC0_IRQn, 0);
 	NVIC_ClearPendingIRQ(ADC0_IRQn);
 	NVIC_EnableIRQ(ADC0_IRQn);
 
@@ -197,13 +198,15 @@ void readADC(void)
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint8_t *precvBuf = NULL;
 
+
 	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
 	if (!pSampleBuf)
 		return;
 	//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
 	//	temp = temp >> 7;
+
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 8;
+	precvBuf[s_index++] = ((ADC_DataSingleGet(ADC0) & 0xFFFF) >> AD_SHIFT);
 
 	if (s_index >= FRAME_DATA_LEN) {
 		s_index = 0;
@@ -211,12 +214,13 @@ void readADC(void)
 		g_adcSampleDataQueue.in++;
 		if (g_adcSampleDataQueue.in == Q_LEN)
 			g_adcSampleDataQueue.in = 0;
-
+		delay_us = 8000;
 		/*
 		 * poll battery voltage every 1 second
 		 * */
 		if (g_Ticks > g_idle_bat_ad_time){
 			pollADCForBattery();
+			delay_us = 6500;
 			g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
 		}
 	}

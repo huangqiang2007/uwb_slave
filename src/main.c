@@ -54,7 +54,9 @@ void clockConfig(void)
 void adc_test(void)
 {
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+	powerADandUWB(0);
 	powerADandUWB(1);
+	powerADandUWB(0);;
 	initADC();
 	while(1){
 		pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
@@ -90,6 +92,8 @@ void rtc_test(void)
 //extern volatile int g_cnt;
 //extern int p_cnt;
 int main(void)
+
+
 {
 
 //	uint32_t l_cnt = 0;
@@ -111,7 +115,7 @@ int main(void)
 	/*
 	 * power up UWB, power down AD
 	 * */
-	powerADandUWB(0);
+	powerADandUWB(1);
 	g_AD_start = false;
 
 	/*
@@ -124,14 +128,23 @@ int main(void)
 	 * SPI master config
 	 * */
 	SPIDMAInit();
+	SET_NUM = 1;
+	DEV_NUM = 1;
+	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
+	if (DEV_NUM == 1 || DEV_NUM == 2) {
+		AD_SHIFT = 8;
+		UWB_Default.AD_Samples = 50;
+	}
 
-	UWB_Default.subnode_id = 4;
-	UWB_Default.AD_Samples = 5000;
-
+	else if (DEV_NUM == 3 || DEV_NUM == 4) {
+		AD_SHIFT = 8;
+		UWB_Default.AD_Samples = 5000;
+	}
 	/*
 	 * configure and start ADC via interrupt
 	 * */
 //	adc_test();
+
 	initADC();
 
 	/*

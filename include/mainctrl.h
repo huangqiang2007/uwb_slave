@@ -61,11 +61,11 @@ typedef struct {
 #define FRAME_DATA_LEN 64
 
 struct MainCtrlFrame {
-	uint8_t head0; //0x55
-	uint8_t head1; //0xaa
+	uint8_t head0; //0xeb
+	uint8_t head1; //0x90
+	uint8_t frameCtrl;
 	uint8_t len; // data len
 	uint8_t serial; // serial num: 0-255
-	uint8_t frameCtrl;
 	uint8_t frameType;
 	uint8_t data[FRAME_DATA_LEN];
 	uint8_t crc0; // crc[7:0]
@@ -73,7 +73,7 @@ struct MainCtrlFrame {
 };
 
 struct BackTokenFrame {
-	uint8_t head0; //0x55
+	uint8_t head0; //0xeb
 	uint8_t head1; //0xaa
 	uint8_t len; // data len
 	uint8_t serial; // serial num: 0-255

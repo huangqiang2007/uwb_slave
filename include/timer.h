@@ -30,7 +30,7 @@ volatile uint32_t g_idle_cmd_timeout;
  *
  * 300000 * 1ms = 5 minutes
  * */
-#define BAT_AD_TIME 	1000 //1 second
+#define BAT_AD_TIME 	5000 //1 second
 volatile uint32_t g_idle_bat_ad_time;
 
 extern void setupTimer0(void);
