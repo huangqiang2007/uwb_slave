@@ -92,8 +92,6 @@ void rtc_test(void)
 //extern volatile int g_cnt;
 //extern int p_cnt;
 int main(void)
-
-
 {
 
 //	uint32_t l_cnt = 0;
@@ -129,7 +127,7 @@ int main(void)
 	 * */
 	SPIDMAInit();
 	SET_NUM = 1;
-	DEV_NUM = 1;
+	DEV_NUM = 3;
 	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
 	if (DEV_NUM == 1 || DEV_NUM == 2) {
 		AD_SHIFT = 8;

@@ -107,7 +107,7 @@ void initADC (void)
 
 	// Modify init structs and initialize
 	if (UWB_Default.AD_Samples == 50){
-		ADC_CLK = 857600;
+		ADC_CLK = 867600;
 		initSingle.acqTime = adcAcqTime256;
 		init.ovsRateSel = adcOvsRateSel64;
 	}
