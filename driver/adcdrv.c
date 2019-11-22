@@ -28,7 +28,7 @@
 /*
  * buffer for two ADC channels
  * */
-static uint8_t g_primaryResultBuffer[2] = {0}, g_alterResultBuffer[2] = {0};
+static uint8_t g_primaryResultBuffer[24] = {0}, g_alterResultBuffer[24] = {0};
 
 /*
  * ADC sample clock
@@ -202,7 +202,7 @@ void collectSamples(uint8_t dataBuf[])
 			if (vol > 3.0)
 				g_batteryVol = ((vol - 3.0) * 100 + 6) / 7;
 
-			delay_us = 6500;
+			//delay_us = 6500;
 			g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
 		}
 	}
@@ -307,18 +307,18 @@ void ADCConfigForScan(void)
 	* Init common issues for both single conversion and scan mode
 	* */
 	init.timebase = ADC_TimebaseCalc(0);
-	init.ovsRateSel = _ADC_CTRL_OVSRSEL_X32;
+//	init.ovsRateSel = _ADC_CTRL_OVSRSEL_X32;
 
 	// Modify init structs and initialize
 	if (UWB_Default.AD_Samples == 50){
-		ADC_CLK = 857600;
+		ADC_CLK = 867600;
 		scanInit.acqTime = adcAcqTime256;
-		init.ovsRateSel = adcOvsRateSel64;
+//		init.ovsRateSel = adcOvsRateSel64;
 	}
 	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 1260000;
-		scanInit.acqTime = adcAcqTime4;
-		init.ovsRateSel = adcOvsRateSel16;
+		ADC_CLK = 360000;
+		scanInit.acqTime = adcAcqTime64;
+//		init.ovsRateSel = adcOvsRateSel16;
 	}
 	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
 	init.lpfMode = adcLPFilterDeCap;
@@ -329,9 +329,9 @@ void ADCConfigForScan(void)
 	* */
 	scanInit.rep = false;
 	scanInit.diff = false;        // single ended
-	scanInit.resolution = adcResOVS;   // 8-bit resolution
+	//scanInit.resolution = adcResOVS;   // 8-bit resolution
 	scanInit.reference = adcRef2V5;
-	//scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
+	scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
 	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4 | ADC_SCANCTRL_INPUTMASK_CH7;
 	ADC_InitScan(ADC0, &scanInit);
 

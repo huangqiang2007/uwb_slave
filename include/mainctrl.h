@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include "libdw1000Types.h"
 
-#define Q_LEN 3
+#define Q_LEN 2
 
 enum {SLAVE_IDLEMODE = 0, SLAVE_RTCIDLEMODE, SLAVE_CMDIDLEMODE, SLAVE_SAMPLEMODE};
 

@@ -1678,7 +1678,7 @@ void dwGpioInterruptConfig(dwDevice_t *dev)
 	 CMU_ClockEnable(cmuClock_GPIO, true);
 	 GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 1);
 	 NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
-	 NVIC_SetPriority(GPIO_ODD_IRQn,15);
+	 NVIC_SetPriority(GPIO_ODD_IRQn,0);
 	 NVIC_EnableIRQ(GPIO_ODD_IRQn);
 	 GPIO_ExtIntConfig(gpioPortB, gpioPortB_11, gpioPortB_11, true, false, true);
 }

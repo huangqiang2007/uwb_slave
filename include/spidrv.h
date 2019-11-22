@@ -5,7 +5,7 @@
 
 #define SPI_CLK 200000
 
-#define UWB_MAX_SPI_LEN 127
+#define UWB_MAX_SPI_LEN 100
 typedef struct {
 	int txlen;
 	int rxlen;

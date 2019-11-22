@@ -198,12 +198,16 @@ void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 	memset(spiTransDes, 0x00, sizeof(*spiTransDes));
 	memcpy(spiTransDes->txBuf, txbuf, txlen);
 
+	while (txlen > 76);
+
+	CORE_CriticalDisableIrq();
 	DMA_ActivateBasic(channelNumTX,
 					true,
 					false,
 					(void *) &USART1->TXDATA,  // Destination address to transfer to
 					(void *) spiTransDes->txBuf,         // Source address to transfer from
 					txlen - 1);       // Number of DMA transfers minus 1
+	CORE_CriticalEnableIrq();
 
 	status = USART1->STATUS;
 	while (!(status & status_txc)) {
