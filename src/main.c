@@ -126,7 +126,7 @@ int main(void)
 	 * SPI master config
 	 * */
 	SPIDMAInit();
-	SET_NUM = 1;
+	SET_NUM = 5;
 	DEV_NUM = 3;
 	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
 	if (DEV_NUM == 1 || DEV_NUM == 2) {

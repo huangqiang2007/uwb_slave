@@ -127,7 +127,7 @@ void initADC (void)
 		init.ovsRateSel = adcOvsRateSel64;
 	}
 	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 1260000;
+		ADC_CLK = 1160000;
 		initSingle.acqTime = adcAcqTime4;
 		init.ovsRateSel = adcOvsRateSel16;
 	}
@@ -169,7 +169,7 @@ void collectSamples(uint8_t dataBuf[])
 		return;
 
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-	precvBuf[s_index++] = dataBuf[0];
+	precvBuf[s_index++] = ((dataBuf[1] << 8 | dataBuf[0]) & 0xFFFF) >> AD_SHIFT;
 
 	if (s_index >= FRAME_DATA_LEN) {
 		s_index = 0;
@@ -191,7 +191,7 @@ void collectSamples(uint8_t dataBuf[])
 			float vol = 0.0;
 
 			// Get ADC result
-			sample = dataBuf[1];
+			sample = ((dataBuf[3] << 8 | dataBuf[2]) & 0xFFFF) >> AD_SHIFT;
 			vol = (float)(sample * 5.0 / 256);
 
 			if (vol > 3.7)
@@ -212,6 +212,8 @@ void DMA_For_ADC_callback(unsigned int channel, bool primary, void *user)
 {
 	static uint8_t drop_cnt = 0;
 	uint8_t *precvBuf = NULL;
+
+	//TIMER_CounterGet();
 
 	/*
 	 * drop first some samples since it's likely ADC
@@ -238,7 +240,7 @@ out:
 		false,
 		NULL,
 		NULL,
-		SCAN_ADC_CHNL_NUM - 1,
+		SCAN_ADC_CHNL_NUM - 2,
 		false);
 
 	ADC_Start(ADC0, adcStartScan);
@@ -270,9 +272,9 @@ void DMAConfigForADC(void)
 	/*
 	* one byte per transfer
 	* */
-	descrCfg.dstInc = dmaDataInc1;
+	descrCfg.dstInc = dmaDataInc2;
 	descrCfg.srcInc = dmaDataIncNone;
-	descrCfg.size = dmaDataSize1;
+	descrCfg.size = dmaDataSize2;
 	descrCfg.arbRate = dmaArbitrate1;
 	descrCfg.hprot = 0;
 	DMA_CfgDescr(DMA_CHANNEL, true, &descrCfg);
@@ -284,10 +286,10 @@ void DMAConfigForADC(void)
 		false,
 		(void *)&g_primaryResultBuffer, // primary destination
 		(void *)&(ADC0->SCANDATA), // primary source
-		SCAN_ADC_CHNL_NUM - 1,
+		SCAN_ADC_CHNL_NUM - 2,
 		(void *)&g_alterResultBuffer, // alternate destination
 		(void *)&(ADC0->SCANDATA), // alternate source
-		SCAN_ADC_CHNL_NUM - 1);
+		SCAN_ADC_CHNL_NUM - 2);
 }
 
 /*
@@ -313,12 +315,12 @@ void ADCConfigForScan(void)
 	if (UWB_Default.AD_Samples == 50){
 		ADC_CLK = 867600;
 		scanInit.acqTime = adcAcqTime256;
-//		init.ovsRateSel = adcOvsRateSel64;
+		init.ovsRateSel = adcOvsRateSel64;
 	}
 	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 360000;
-		scanInit.acqTime = adcAcqTime64;
-//		init.ovsRateSel = adcOvsRateSel16;
+		ADC_CLK = 1260000;
+		scanInit.acqTime = adcAcqTime4;
+		init.ovsRateSel = adcOvsRateSel16;
 	}
 	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
 	init.lpfMode = adcLPFilterDeCap;
@@ -329,10 +331,11 @@ void ADCConfigForScan(void)
 	* */
 	scanInit.rep = false;
 	scanInit.diff = false;        // single ended
-	//scanInit.resolution = adcResOVS;   // 8-bit resolution
+	scanInit.resolution = adcResOVS;   // 8-bit resolution
 	scanInit.reference = adcRef2V5;
-	scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
-	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4 | ADC_SCANCTRL_INPUTMASK_CH7;
+	//scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
+	//scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4 | ADC_SCANCTRL_INPUTMASK_CH7;
+	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4;
 	ADC_InitScan(ADC0, &scanInit);
 
 	/*
