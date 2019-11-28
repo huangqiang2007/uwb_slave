@@ -107,16 +107,18 @@ void initADC (void)
 
 	// Modify init structs and initialize
 	if (UWB_Default.AD_Samples == 50){
-		ADC_CLK = 857600;
+		ADC_CLK = 867600;
 		initSingle.acqTime = adcAcqTime256;
 		init.ovsRateSel = adcOvsRateSel64;
 	}
 	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 1400000;
+		ADC_CLK = 1260000;
+//		ADC_CLK = 3000000;
 		initSingle.acqTime = adcAcqTime4;
 		init.ovsRateSel = adcOvsRateSel16;
 	}
 	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0); // Init to max ADC clock for Series 0
+	init.lpfMode = adcLPFilterDeCap; //Init Filter Type
 
 	initSingle.diff       = false;        // single ended
 	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
@@ -134,6 +136,7 @@ void initADC (void)
 	ADC_IntEnable(ADC0, ADC_IEN_SINGLE);
 
 	// Enable ADC interrupts
+	NVIC_SetPriority(ADC0_IRQn, 0);
 	NVIC_ClearPendingIRQ(ADC0_IRQn);
 	NVIC_EnableIRQ(ADC0_IRQn);
 
@@ -177,6 +180,7 @@ void pollADCForBattery (void)
 
 	// Get ADC result
 	sample = ADC_DataSingleGet(ADC0);
+
 	vol = (float)(sample * 5.0 / 256);
 
 	if (vol > 3.7) vol = 3.7;
@@ -211,12 +215,13 @@ void readADC(void)
 		g_adcSampleDataQueue.in++;
 		if (g_adcSampleDataQueue.in == Q_LEN)
 			g_adcSampleDataQueue.in = 0;
-
+		delay_us = 8500;
 		/*
 		 * poll battery voltage every 1 second
 		 * */
 		if (g_Ticks > g_idle_bat_ad_time){
 			pollADCForBattery();
+			//delay_us = 6500;
 			g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
 		}
 	}

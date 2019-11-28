@@ -1678,6 +1678,7 @@ void dwGpioInterruptConfig(dwDevice_t *dev)
 	 CMU_ClockEnable(cmuClock_GPIO, true);
 	 GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 1);
 	 NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
+	 NVIC_SetPriority(GPIO_ODD_IRQn,15);
 	 NVIC_EnableIRQ(GPIO_ODD_IRQn);
 	 GPIO_ExtIntConfig(gpioPortB, gpioPortB_11, gpioPortB_11, true, false, true);
 }
@@ -1732,7 +1733,7 @@ void dwRecvData(dwDevice_t *dev)
 
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
-	if (((g_recvSlaveFr.frameCtrl & 0x07) == UWB_Default.subnode_id) && (((g_recvSlaveFr.frameCtrl & 0x80) == 0) || ((g_recvSlaveFr.frameCtrl & 0x80) == 1))){
+	if (((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) && ((g_recvSlaveFr.frameType % 2)== 1)){
 		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
 		g_dataRecvDone = true;
 //		if(g_recvSlaveFr.frameType == 0x03){

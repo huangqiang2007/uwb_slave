@@ -55,6 +55,8 @@ void adc_test(void)
 {
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	powerADandUWB(1);
+	powerADandUWB(0);
+	powerADandUWB(1);;
 	initADC();
 	while(1){
 		pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
@@ -124,14 +126,16 @@ int main(void)
 	 * SPI master config
 	 * */
 	SPIDMAInit();
-
-	UWB_Default.subnode_id = 4;
-	UWB_Default.AD_Samples = 5000;
-
+	SET_NUM = 5;
+	DEV_NUM = 1;//LPF
+	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
+	if (DEV_NUM == 1 || DEV_NUM == 2) UWB_Default.AD_Samples = 50;
+	else if (DEV_NUM == 3 || DEV_NUM == 4) UWB_Default.AD_Samples = 5000;
 	/*
 	 * configure and start ADC via interrupt
 	 * */
-//	adc_test();
+	//adc_test();
+
 	initADC();
 
 	/*

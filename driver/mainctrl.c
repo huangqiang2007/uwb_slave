@@ -126,8 +126,8 @@ void InitFrame(struct MainCtrlFrame *mainCtrlFr, uint8_t src, uint8_t slave,
 {
 	uint16_t data_crc = 0;
 
-	mainCtrlFr->head0 = 0x55;
-	mainCtrlFr->head1 = 0xaa;
+	mainCtrlFr->head0 = 0xeb;
+	mainCtrlFr->head1 = 0x90;
 	mainCtrlFr->len = 0;
 	mainCtrlFr->frameCtrl = ((src & 0x03) < 6) | (slave & 0x7);
 	mainCtrlFr->frameType = type & 0xf;
@@ -231,7 +231,7 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	if (!pSampleBuf) {
 		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
 		pMainCtrlFrame->len = 0;
-		delay_us = 8000;
+		delay_us = 8500;
 	} else {
 		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
 		pMainCtrlFrame->len = FRAME_DATA_LEN;
@@ -240,7 +240,7 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 		 * update sampled battery voltage
 		 * */
 		pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
-		delay_us = 6500;
+		//delay_us = 7000;
 	}
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
@@ -320,7 +320,7 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 			form_sleep_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			g_AD_start = false;
 			g_cur_mode = SLAVE_RTCIDLEMODE;
-			break;
+			return ret;
 
 		default:
 			break;

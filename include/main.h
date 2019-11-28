@@ -9,6 +9,8 @@ typedef struct UWB_Config {
 } UWB_Config;
 
 UWB_Config UWB_Default;
+uint8_t SET_NUM;
+uint8_t DEV_NUM;
 /*
  * DMA channel for ADC scan mode
  * */
