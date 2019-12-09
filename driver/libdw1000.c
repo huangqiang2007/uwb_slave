@@ -79,11 +79,11 @@ void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 	dev->networkAndAddress[3] = PanID>>8;
 	dev->extendedFrameLength = FRAME_LENGTH_NORMAL;
 	dev->pacSize = PAC_SIZE_8;
-	dev->pulseFrequency = TX_PULSE_FREQ_16MHZ;
+	dev->pulseFrequency = TX_PULSE_FREQ_64MHZ;
 	dev->dataRate = TRX_RATE_6800KBPS;
 	dev->preambleLength = TX_PREAMBLE_LEN_128;
-	dev->preambleCode = PREAMBLE_CODE_16MHZ_2;
-	dev->channel = CHANNEL_1;
+	dev->preambleCode = PREAMBLE_CODE_64MHZ_9;
+	dev->channel = CHANNEL_2;
 	dev->smartPower = true;
 	dev->frameCheck = true;
 	dev->permanentReceive = false;
@@ -547,6 +547,21 @@ void dwSetTxRxTime(dwDevice_t* dev, const dwTime_t futureTime) {
 	dwSpiWrite(dev, DX_TIME, NO_SUB, delayBytes, LEN_DX_TIME);
 }
 
+void dwSetTxRxTime2(dwDevice_t* dev, uint8_t futureTime[5]) {
+	if(dev->deviceMode == TX_MODE) {
+		setBit(dev->sysctrl, LEN_SYS_CTRL, TXDLYS_BIT, true);
+	} else if(dev->deviceMode == RX_MODE) {
+		setBit(dev->sysctrl, LEN_SYS_CTRL, RXDLYS_BIT, true);
+	} else {
+		return;
+	}
+	uint8_t delayBytes[5];
+  memcpy(delayBytes, futureTime, 5);
+	delayBytes[0] = 0;
+	delayBytes[1] &= 0xFE;
+	dwSpiWrite(dev, DX_TIME, NO_SUB, delayBytes, LEN_DX_TIME);
+}
+
 
 void dwSetDataRate(dwDevice_t* dev, uint8_t rate) {
 	rate &= 0x03;
@@ -679,7 +694,7 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 //		dwSetFrameFilterBehaveCoordinator(dev, true);
 
 		//interrupt active for complete transmit
-		dwInterruptOnSent(dev, true);
+		dwInterruptOnSent(dev, false);
 		//interrupt active for complete receive
 		dwInterruptOnReceived(dev, true);
 		//interrupt active for receiver timeout when dwSetReceiveWaitTimeout() is enable true
@@ -738,7 +753,7 @@ void dwSetSubNodeConfig(dwDevice_t* dev) {
 //		//sub_node act as coordinator
 //		dwSetFrameFilterBehaveCoordinator(dev, false);
 
-		dwInterruptOnSent(dev, true);
+		dwInterruptOnSent(dev, false);
 		dwInterruptOnReceived(dev, true);
 		dwInterruptOnReceiveTimeout(dev, false);
 		dwInterruptOnReceiveFailed(dev, true);
@@ -1725,7 +1740,7 @@ void dwRecvData(dwDevice_t *dev)
 {
 	int len = 0;
 
-	memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
+	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
 	len = dwGetDataLength(dev);
 
 //	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
@@ -1754,7 +1769,30 @@ void dwSentData(dwDevice_t *dev)
 
 void dwReceiveFailed(dwDevice_t *dev)
 {
-	;
+//	int len = 0;
+//
+//	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
+//	len = dwGetDataLength(dev);
+//
+////	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
+////	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
+//
+////	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
+//
+//	if (((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) && ((g_recvSlaveFr.frameType % 2)== 1)){
+//
+//		g_recvSlaveFr.serial = g_recvSlaveFr.serial + 1;
+//		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
+//		g_dataRecvDone = true;
+////		if(g_recvSlaveFr.frameType == 0x03){
+////			g_cnt += 1;
+////		}
+//	}
+//	else{
+//		dwNewReceive(dev);
+//		dwStartReceive(dev);
+//		g_dataRecvDone = false;
+//	}
 	dwNewReceive(dev);
 	dwStartReceive(dev);
 	g_dataRecvDone = false;

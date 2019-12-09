@@ -37,7 +37,8 @@ void globalInit(void)
 	memset((void *)&g_dwDev, 0x00, sizeof(g_dwDev));
 
 	g_batteryVol = 0;
-	delay_us = 8000;
+	delay_us = 8750;
+	frm_cnt = 0;
 }
 
 void sleepAndRestore(void)
@@ -126,8 +127,8 @@ void InitFrame(struct MainCtrlFrame *mainCtrlFr, uint8_t src, uint8_t slave,
 {
 	uint16_t data_crc = 0;
 
-	mainCtrlFr->head0 = 0xeb;
-	mainCtrlFr->head1 = 0x90;
+	mainCtrlFr->head0 = 0xaa;
+	mainCtrlFr->head1 = 0x55;
 	mainCtrlFr->len = 0;
 	mainCtrlFr->frameCtrl = ((src & 0x03) < 6) | (slave & 0x7);
 	mainCtrlFr->frameType = type & 0xf;
@@ -135,7 +136,7 @@ void InitFrame(struct MainCtrlFrame *mainCtrlFr, uint8_t src, uint8_t slave,
 
 	data_crc = CalFrameCRC(mainCtrlFr->data, FRAME_DATA_LEN);
 	mainCtrlFr->crc0 = data_crc & 0xff;
-	mainCtrlFr->crc1 = (data_crc >> 8) & 0xff;
+	//mainCtrlFr->crc1 = (data_crc >> 8) & 0xff;
 }
 
 bool queueFull(struct ReceivedPacketQueue *frameQueue)
@@ -215,8 +216,8 @@ void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, stru
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
-	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
-
+	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+	frm_cnt = 0;
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8000);
 }
 
@@ -231,23 +232,23 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	if (!pSampleBuf) {
 		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
 		pMainCtrlFrame->len = 0;
-		delay_us = 8500;
+		//delay_us = 8500;
 	} else {
 		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
-		pMainCtrlFrame->len = FRAME_DATA_LEN;
-
+		pMainCtrlFrame->len = FRAME_LEN;
+		frm_cnt++;
 		/*
 		 * update sampled battery voltage
 		 * */
 		pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
-		//delay_us = 7000;
+		//delay_us = 8500;
 	}
-
+	pMainCtrlFrame->serial = frm_cnt;
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
-	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, delay_us);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8750);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -262,7 +263,7 @@ void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, st
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
-	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 50);
 }
@@ -278,7 +279,7 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
-	pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 50);
 }

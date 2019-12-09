@@ -59,29 +59,34 @@ typedef struct {
 
 
 #define FRAME_DATA_LEN 64
+#define FRAME_LEN 76
 
 struct MainCtrlFrame {
 	uint8_t head0; //0xeb
 	uint8_t head1; //0x90
-	uint8_t frameCtrl;
 	uint8_t len; // data len
+	uint8_t frameID;
 	uint8_t serial; // serial num: 0-255
+	uint8_t frameCtrl_blank[3];
+	uint8_t frameCtrl;
 	uint8_t frameType;
+	uint8_t blank;
 	uint8_t data[FRAME_DATA_LEN];
 	uint8_t crc0; // crc[7:0]
-	uint8_t crc1; // crc[15:8]
 };
 
 struct BackTokenFrame {
 	uint8_t head0; //0xeb
-	uint8_t head1; //0xaa
+	uint8_t head1; //0x90
 	uint8_t len; // data len
+	uint8_t frameID;
 	uint8_t serial; // serial num: 0-255
+	uint8_t frameCtrl_blank[3];
 	uint8_t frameCtrl;
 	uint8_t frameType;
+	uint8_t blank;
 	uint8_t data[FRAME_DATA_LEN];
 	uint8_t crc0; // crc[7:0]
-	uint8_t crc1; // crc[15:8]
 };
 
 /*
@@ -100,6 +105,8 @@ struct ReceivedPacketQueue g_ReceivedPacketQueue;
 
 volatile uint8_t g_cur_mode;
 
+uint8_t frm_cnt;
+
 /*
  * true: received new cmd
  * false: received no cmd
@@ -107,6 +114,7 @@ volatile uint8_t g_cur_mode;
 bool g_received_cmd;
 
 bool g_dataRecvDone;
+bool g_dataRecvFail;
 
 bool g_AD_start;
 
