@@ -35,10 +35,14 @@ typedef struct {
 
 AdcSampleDataQueueDef g_adcSampleDataQueue;
 
+int8_t s_index;
+bool s_index_chg;
+
 extern void ADCStart(void);
 extern void initADC(void);
 extern void ADCPoll(void);
 ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue);
 void pollADCForBattery (void);
+void ADC0_Reset(void);
 
 #endif /* ADCDRV_H_ */

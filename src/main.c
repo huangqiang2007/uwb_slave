@@ -16,7 +16,7 @@
 #include "rtcdrv.h"
 #include "Typedefs.h"
 #include "libdw1000.h"
-
+#include "em_timer.h"
 void clockConfig(void)
 {
 	CMU_ClockEnable(cmuClock_GPIO, true);
@@ -101,11 +101,6 @@ int main(void)
 	CHIP_Init();
 
 	/*
-	 * some global configuration
-	 * */
-	globalInit();
-
-	/*
 	 * config needed clock
 	 * */
 	clockConfig();
@@ -127,16 +122,43 @@ int main(void)
 	 * */
 	SPIDMAInit();
 	SET_NUM = 5;
-	DEV_NUM = 1;//LPF
+	DEV_NUM = 4;
 	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
-	if (DEV_NUM == 1 || DEV_NUM == 2) UWB_Default.AD_Samples = 50;
-	else if (DEV_NUM == 3 || DEV_NUM == 4) UWB_Default.AD_Samples = 5000;
+	if (DEV_NUM == 1 ) {
+		UWB_Default.AD_Samples = 50;
+		delay_sync_us = 8000;
+		delay_sync_ms = 1;
+		frm_cnt_init = 0;
+	}
+	else if (DEV_NUM == 2){
+		UWB_Default.AD_Samples = 50;
+		delay_sync_us = 6000;
+		delay_sync_ms = 3;
+		frm_cnt_init = 0;
+	}
+	else if (DEV_NUM == 3) {
+		UWB_Default.AD_Samples = 5000;
+		delay_sync_us = 4000;
+		delay_sync_ms = 5;
+		frm_cnt_init = 0;
+	}
+	else if (DEV_NUM == 4) {
+		UWB_Default.AD_Samples = 5000;
+		delay_sync_us = 2000;
+		delay_sync_ms = 7;
+		frm_cnt_init = 0;
+	}
+
+	/*
+	 * some global configuration
+	 * */
+	globalInit();
 	/*
 	 * configure and start ADC via interrupt
 	 * */
 	//adc_test();
 
-	initADC();
+	//initADC();
 
 	/*
 	 * init RTC for LFRCO 32.768KHz
@@ -154,15 +176,17 @@ int main(void)
 	Delay_ms(5);
 	GPIO_PinModeSet(gpioPortA, 2, gpioModePushPull, 1);
 
+	g_batteryVol = 0;
 	dwDeviceInit(&g_dwDev);
 
 	UDELAY_Calibrate();
 	Delay_ms(500);
+
 	/*
 	 * reset g_idle_wkup_timeout and g_idle_bat_ad_time duration upon boot.
 	 * */
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
-	g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
+	//g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
 
 	dwNewReceive(&g_dwDev);
 	dwStartReceive(&g_dwDev);
@@ -188,6 +212,15 @@ int main(void)
 				if (g_received_cmd && g_Ticks > g_idle_cmd_timeout){
 					g_AD_start = false;
 					g_cur_mode = SLAVE_CMDIDLEMODE;
+				}
+
+				/*
+				 * When the system had received CMD, but it doesn't received CMD again
+				 * during 'g_idle_cmd_timeout' time window. The system will enter into
+				 * EM2 mode.
+				 * */
+				if (g_received_cmd && g_Ticks > g_adc_idle_cmd_timeout){
+					ADC0_Reset();
 				}
 
 				break;

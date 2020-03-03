@@ -6,6 +6,7 @@
 #include "em_emu.h"
 #include "em_rtc.h"
 #include "em_gpio.h"
+#include "em_adc.h"
 #include "uartdrv.h"
 #include "mainctrl.h"
 #include "em_core.h"
@@ -36,9 +37,11 @@ void globalInit(void)
 	memset(&g_dwMacFrameSend, 0x00, sizeof(g_dwMacFrameSend));
 	memset((void *)&g_dwDev, 0x00, sizeof(g_dwDev));
 
-	g_batteryVol = 0;
 	delay_us = 8750;
-	frm_cnt = 0;
+	frm_cnt = frm_cnt_init;
+	s_index = 0;
+	slave_adc_index = 0;
+	s_index_chg = false;
 }
 
 void sleepAndRestore(void)
@@ -92,6 +95,7 @@ void sleepAndRestore(void)
 	 * re-init some global vars
 	 * */
 	globalInit();
+	ADC0_Reset();
 	dwDeviceInit(&g_dwDev);
 	Delay_ms(2);
 //	UDELAY_Calibrate();
@@ -103,8 +107,7 @@ void sleepAndRestore(void)
 	dwStartReceive(&g_dwDev);
 	g_Ticks = 0;
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
-	g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
-	delay_us = 8000;
+	//g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
 }
 
 /*
@@ -188,9 +191,9 @@ struct MainCtrlFrame *dequeueFrame(struct ReceivedPacketQueue *frameQueue)
 	if (frameQueue->p_out == Q_LEN)
 		frameQueue->p_out = 0;
 
-	CORE_CriticalDisableIrq();
+	//CORE_CriticalDisableIrq();
 	frameQueue->len--;
-	CORE_CriticalEnableIrq();
+	//CORE_CriticalEnableIrq();
 
 	return pmainCtrlFrame;
 }
@@ -217,7 +220,8 @@ void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, stru
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
-	frm_cnt = 0;
+	frm_cnt = frm_cnt_init;
+
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8000);
 }
 
@@ -226,9 +230,16 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint16_t data_crc;
 
+	if ((g_recvSlaveFr.frameType & 0x80) == 0x00)
+		delay_us = 8750;
+	else
+		delay_us = delay_sync_us;
+
 	pMainCtrlFrame->frameType = ENUM_SAMPLE_DATA_TOKEN;
+	//adc_index = pMainCtrlFrame->adcIndex;
 
 	pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
+
 	if (!pSampleBuf) {
 		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
 		pMainCtrlFrame->len = 0;
@@ -240,15 +251,16 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 		/*
 		 * update sampled battery voltage
 		 * */
-		pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
 		//delay_us = 8500;
 	}
+	pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
+	pMainCtrlFrame->adcIndex = slave_adc_index;
 	pMainCtrlFrame->serial = frm_cnt;
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8750);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, delay_us);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -276,7 +288,7 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 	//pMainCtrlFrame->frameCtrl |= SLAVE_NODE;
 
 	pMainCtrlFrame->frameType = ENUM_SLAVE_SLEEP_TOKEN;
-
+	pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
@@ -284,7 +296,31 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 50);
 }
 
-int p_cnt=0;
+void Sync_Slave_Bat_Get(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame, bool getBat)
+{
+
+//	CORE_CriticalDisableIrq();
+	slave_adc_index = (g_adcSampleDataQueue.in << 6) | s_index;
+//	pollADCForBattery();
+
+	if (getBat){
+		NVIC_DisableIRQ(ADC0_IRQn);
+		pollADCForBattery();
+	}
+	else{
+		NVIC_DisableIRQ(ADC0_IRQn);
+		initADC();
+	}
+//	CORE_CriticalEnableIrq();
+	g_idle_bat_ad_time = g_Ticks + delay_sync_ms;
+	while(g_Ticks < g_idle_bat_ad_time) ;
+
+	dwNewReceive(dev);
+	dwStartReceive(dev);
+	g_dataRecvDone = false;
+}
+
+//int p_cnt=0;
 
 int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 {
@@ -309,6 +345,14 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 			}
 			break;
 
+		case ENUM_SLAVE_SYNC:
+			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame, false);
+			break;
+
+		case ENUM_SLAVE_BAT:
+			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame, true);
+			break;
+
 		case ENUM_SAMPLE_DATA:
 			form_sample_data_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
@@ -318,21 +362,27 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 			break;
 
 		case ENUM_SLAVE_SLEEP:
-			form_sleep_token_frame(dev, dwMacFrame, pMainCtrlFrame);
-			g_AD_start = false;
-			g_cur_mode = SLAVE_RTCIDLEMODE;
-			return ret;
-
+			if ((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id){
+				form_sleep_token_frame(dev, dwMacFrame, pMainCtrlFrame);
+				Delay_ms(100);
+				g_AD_start = false;
+				g_cur_mode = SLAVE_RTCIDLEMODE;
+				return ret;
+			}
+			dwNewReceive(dev);
+			dwStartReceive(dev);
+			break;
 		default:
 			break;
 	}
 
-	CORE_CriticalDisableIrq();
+	//CORE_CriticalDisableIrq();
 	if (g_ReceivedPacketQueue.len == 0) {
 		g_idle_cmd_timeout = g_Ticks + IDLE_CMD_TIMEOUT;
+		g_adc_idle_cmd_timeout = g_Ticks + ADC_IDLE_CMD_TIMEOUT;
 		g_cur_mode = SLAVE_IDLEMODE;
 	}
-	CORE_CriticalEnableIrq();
+	//CORE_CriticalEnableIrq();
 
 	return ret;
 }

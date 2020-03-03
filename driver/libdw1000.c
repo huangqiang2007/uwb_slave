@@ -85,7 +85,7 @@ void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 	dev->preambleCode = PREAMBLE_CODE_64MHZ_9;
 	dev->channel = CHANNEL_2;
 	dev->smartPower = true;
-	dev->frameCheck = true;
+	dev->frameCheck = false;
 	dev->permanentReceive = false;
 	dev->deviceMode = IDLE_MODE;
 	dev->wait4resp = false;
@@ -672,7 +672,7 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 		//set auto send acknowledgment after receive a frame with a acknowledgment request
 		dwSetAutoAck(dev,false);
 		//set CRC frame check
-		dwSuppressFrameCheck(dev, false);
+		dwSuppressFrameCheck(dev, true);
 		//set receiver timeout turn-off time
 		dwSetReceiveWaitTimeout(dev,0);
 		//set active high for interrupt
@@ -1748,9 +1748,9 @@ void dwRecvData(dwDevice_t *dev)
 
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
-	if (((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) && ((g_recvSlaveFr.frameType % 2)== 1)){
+	if ((((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) || ((g_recvSlaveFr.frameCtrl & 0xff) == 0x00)) && (((g_recvSlaveFr.frameType & 0x0f) % 2)== 1)){
 		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
-		g_dataRecvDone = true;
+		//g_dataRecvDone = true;
 //		if(g_recvSlaveFr.frameType == 0x03){
 //			g_cnt += 1;
 //		}
@@ -1758,7 +1758,7 @@ void dwRecvData(dwDevice_t *dev)
 	else{
 		dwNewReceive(dev);
 		dwStartReceive(dev);
-		g_dataRecvDone = false;
+		//g_dataRecvDone = false;
 	}
 }
 

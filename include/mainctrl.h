@@ -48,7 +48,10 @@ enum {
 	ENUM_SLAVE_STATUS,
 	ENUM_SLAVE_STATUS_TOKEN,
 	ENUM_SLAVE_SLEEP,
-	ENUM_SLAVE_SLEEP_TOKEN
+	ENUM_SLAVE_SLEEP_TOKEN,
+	ENUM_SLAVE_SYNC,
+	ENUM_SLAVE_SYNC_TOKEN,
+	ENUM_SLAVE_BAT
 };
 
 typedef struct {
@@ -70,7 +73,7 @@ struct MainCtrlFrame {
 	uint8_t frameCtrl_blank[3];
 	uint8_t frameCtrl;
 	uint8_t frameType;
-	uint8_t blank;
+	uint8_t adcIndex;
 	uint8_t data[FRAME_DATA_LEN];
 	uint8_t crc0; // crc[7:0]
 };
@@ -118,7 +121,13 @@ bool g_dataRecvFail;
 
 bool g_AD_start;
 
+uint8_t adc_index;
+
 uint32_t delay_us;
+uint32_t delay_sync_us;
+uint32_t delay_sync_ms;
+uint8_t frm_cnt_init;
+uint8_t slave_adc_index;
 
 extern void globalInit(void);
 extern void sleepAndRestore(void);

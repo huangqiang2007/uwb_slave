@@ -24,13 +24,21 @@ volatile uint32_t g_idle_wkup_timeout;
  * */
 #define IDLE_CMD_TIMEOUT 300000 //300 second
 volatile uint32_t g_idle_cmd_timeout;
+/*
+ * when it does not receive cmd in below duration since the last command,
+ * stops ADC.
+ *
+ * 1000 * 1ms = 1 s
+ * */
+#define ADC_IDLE_CMD_TIMEOUT 1000 //300 second
+volatile uint32_t g_adc_idle_cmd_timeout;
 
 /*
  * BAT Voltage ADC
  *
  * 300000 * 1ms = 5 minutes
  * */
-#define BAT_AD_TIME 	2000 //1 second
+//#define BAT_AD_TIME 	10000 //10 second
 volatile uint32_t g_idle_bat_ad_time;
 
 extern void setupTimer0(void);

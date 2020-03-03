@@ -104,7 +104,7 @@ void setupTimer1(void)
 	NVIC_EnableIRQ(TIMER1_IRQn);
 
 	/* Set TIMER Top value */
-	//  TIMER_TopSet(TIMER1, TOP);
+	//TIMER_TopSet(TIMER1, 3125);
 
 	/* Configure TIMER */
 	TIMER_Init(TIMER1, &timerInit);

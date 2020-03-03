@@ -82,14 +82,14 @@ ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue)
 
 	if (sampleQueueEmpty(adcSampleDataQueue))
 		return NULL;
-
+	//adcSampleDataQueue->out
 	pSampleBuf = (ADC_SAMPLE_BUFFERDef *)&adcSampleDataQueue->adc_smaple_data[adcSampleDataQueue->out++];
 	if (adcSampleDataQueue->out == Q_LEN)
 		adcSampleDataQueue->out = 0;
 
-	CORE_CriticalDisableIrq();
+//	CORE_CriticalDisableIrq();
 	adcSampleDataQueue->samples--;
-	CORE_CriticalEnableIrq();
+//	CORE_CriticalEnableIrq();
 
 	return pSampleBuf;
 }
@@ -158,7 +158,7 @@ void pollADCForBattery (void)
 	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
 
 	// Modify init structs and initialize
-	init.prescale = ADC_PrescaleCalc(1000000, 0); // Init to max ADC clock for Series 0
+	init.prescale = ADC_PrescaleCalc(500000, 0); // Init to max ADC clock for Series 0
 
 	initSingle.diff       = false;        // single ended
 	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
@@ -193,11 +193,12 @@ void pollADCForBattery (void)
 	 * re-init ADC for sensor sample
 	 * */
 	initADC();
+
 }
 
 void readADC(void)
 {
-	static int8_t s_index = 0;
+
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint8_t *precvBuf = NULL;
 
@@ -209,21 +210,23 @@ void readADC(void)
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
 	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 8;
 
+	/*
+	 * poll battery voltage every 1 second
+	 * */
+//	if (g_Ticks > g_idle_bat_ad_time){
+//		pollADCForBattery();
+//		//delay_us = 6500;
+//		g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
+//	}
+
 	if (s_index >= FRAME_DATA_LEN) {
 		s_index = 0;
 		g_adcSampleDataQueue.samples++;
 		g_adcSampleDataQueue.in++;
 		if (g_adcSampleDataQueue.in == Q_LEN)
 			g_adcSampleDataQueue.in = 0;
-		delay_us = 8500;
-		/*
-		 * poll battery voltage every 1 second
-		 * */
-		if (g_Ticks > g_idle_bat_ad_time){
-			pollADCForBattery();
-			//delay_us = 6500;
-			g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
-		}
+		//delay_us = 8500;
+
 	}
 }
 
@@ -252,6 +255,16 @@ void ADC0_IRQHandler(void)
 
 	// Start next ADC conversion
 	//ADC_Start(ADC0, adcStartSingle);
+}
+void ADC0_Reset(void){
+	ADC_Reset(ADC0);
+	s_index = 0;
+	g_adcSampleDataQueue.in = 0;
+	g_adcSampleDataQueue.out = 0;
+	g_adcSampleDataQueue.samples = 0;
+	for (int i=0; i < Q_LEN; i++){
+		memset(&g_adcSampleDataQueue.adc_smaple_data[i], 0x00, FRAME_DATA_LEN);
+	}
 }
 
 #if ADC_DMA_ENABLE
