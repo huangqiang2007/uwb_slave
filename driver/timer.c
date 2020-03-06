@@ -11,7 +11,8 @@
 
 // Freq = 25M
 #define TOP 25000
-#define MS_COUNT  3125  //25000000 / 8 / 1000
+//#define MS_COUNT  3125  //25000000 / 8 / 1000
+#define MS_COUNT  625  //25000000 / 8 / 1000
 #define MAX_MS    20    //65535 / MS_COUNT for sleep time
 
 volatile bool Timer1_overflow;
@@ -63,10 +64,10 @@ void setupTimer0(void)
 	};
 
 	/* Enable overflow interrupt */
-	TIMER_IntEnable(TIMER0, TIMER_IF_OF);
+	//TIMER_IntEnable(TIMER0, TIMER_IF_OF);
 
 	/* Enable TIMER0 interrupt vector in NVIC */
-	NVIC_EnableIRQ(TIMER0_IRQn);
+	//NVIC_EnableIRQ(TIMER0_IRQn);
 
 	/* Set TIMER Top value */
 	//TIMER_TopSet(TIMER0, TOP);

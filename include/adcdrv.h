@@ -41,5 +41,6 @@ extern void ADCPoll(void);
 ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue);
 void pollADCForBattery (void);
 extern void ADCConfigForScan(void);
+extern void prsTimerAdc(void);
 
 #endif /* ADCDRV_H_ */

@@ -3,6 +3,8 @@
 #include "em_adc.h"
 #include "em_cmu.h"
 #include "em_core.h"
+#include "em_timer.h"
+#include "em_prs.h"
 #include "time.h"
 #include "adcdrv.h"
 #include "dmactrl.h"
@@ -24,16 +26,22 @@
  * Two ADC channel for Scan mode
  * */
 #define SCAN_ADC_CHNL_NUM 2
+#define SCAN_ADC_DMA_LEN  24
 
+/* Defines for ADC */
+#define PRS_ADC_CH      5               /* PRS channel */
+#define ADC_PRS_CH      adcPRSSELCh5
+#define ADC_START_CNT   300 	        /* First PRS TIMER trigger count */
+#define ADC_VDD_X1000   3300            /* VDD x 1000 */
+#define ADC_AVDD_VFS    (float)3.3      /* AVDD */
+#define ADC_12BIT_MAX   4096            /* 2^12 */
+
+#define ADC_DMA_CHANNEL         0
+#define ADC_SCAN_CH_NUMBER      3
 /*
  * buffer for two ADC channels
  * */
-static uint8_t g_primaryResultBuffer[24] = {0}, g_alterResultBuffer[24] = {0};
-
-/*
- * ADC sample clock
- * */
-//#define ADC_CLK 1150000
+static uint16_t g_primaryResultBuffer[SCAN_ADC_DMA_LEN] = {0}, g_alterResultBuffer[SCAN_ADC_DMA_LEN] = {0};
 
 /*
  * drop several samples before ADC is stable.
@@ -127,7 +135,7 @@ void initADC (void)
 		init.ovsRateSel = adcOvsRateSel64;
 	}
 	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 1160000;
+		ADC_CLK = 1260000;
 		initSingle.acqTime = adcAcqTime4;
 		init.ovsRateSel = adcOvsRateSel16;
 	}
@@ -163,13 +171,19 @@ void collectSamples(uint8_t dataBuf[])
 	static int8_t s_index = 0;
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint8_t *precvBuf = NULL;
+	uint32_t sample;
+	float vol = 0.0;
 
 	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
 	if (!pSampleBuf)
 		return;
 
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
+//	for (int i=0;i<SCAN_ADC_DMA_LEN/2;i+2){
 	precvBuf[s_index++] = ((dataBuf[1] << 8 | dataBuf[0]) & 0xFFFF) >> AD_SHIFT;
+		//precvBuf[s_index++] = ((dataBuf[i+1] << 8 | dataBuf[i]) & 0xFFFF) >> AD_SHIFT;
+//	}
+	sample = ((dataBuf[3] << 8 | dataBuf[2]) & 0xFFFF) >> AD_SHIFT;
 
 	if (s_index >= FRAME_DATA_LEN) {
 		s_index = 0;
@@ -179,19 +193,13 @@ void collectSamples(uint8_t dataBuf[])
 		if (g_adcSampleDataQueue.in == Q_LEN)
 			g_adcSampleDataQueue.in = 0;
 
-		delay_us = 8000;
-
 		/*
 		 * poll battery voltage every 1 second
 		 * */
 		if (g_Ticks > g_idle_bat_ad_time){
 			//pollADCForBattery();
-
-			uint32_t sample;
-			float vol = 0.0;
-
 			// Get ADC result
-			sample = ((dataBuf[3] << 8 | dataBuf[2]) & 0xFFFF) >> AD_SHIFT;
+
 			vol = (float)(sample * 5.0 / 256);
 
 			if (vol > 3.7)
@@ -212,7 +220,7 @@ void DMA_For_ADC_callback(unsigned int channel, bool primary, void *user)
 {
 	static uint8_t drop_cnt = 0;
 	uint8_t *precvBuf = NULL;
-
+	static int cnt = 0;
 	//TIMER_CounterGet();
 
 	/*
@@ -229,18 +237,19 @@ void DMA_For_ADC_callback(unsigned int channel, bool primary, void *user)
 	} else {
 		precvBuf = g_alterResultBuffer;
 	}
-
-	collectSamples(precvBuf);
+	cnt=cnt+1;
+	//collectSamples(precvBuf);
 
 out:
 	/* Re-activate the DMA */
+
 	DMA_RefreshPingPong(
 		channel,
 		primary,
 		false,
 		NULL,
 		NULL,
-		SCAN_ADC_CHNL_NUM - 2,
+		3,//(SCAN_ADC_DMA_LEN>>2) - 1,
 		false);
 
 	ADC_Start(ADC0, adcStartScan);
@@ -263,7 +272,7 @@ void DMAConfigForADC(void)
 	dma_adc_cb.cbFunc = DMA_For_ADC_callback;
 	dma_adc_cb.userPtr = NULL;
 
-	chnlCfg.highPri = false;
+	chnlCfg.highPri = true;
 	chnlCfg.enableInt = true;
 	chnlCfg.select = DMAREQ_ADC0_SCAN;
 	chnlCfg.cb = &dma_adc_cb;
@@ -275,7 +284,7 @@ void DMAConfigForADC(void)
 	descrCfg.dstInc = dmaDataInc2;
 	descrCfg.srcInc = dmaDataIncNone;
 	descrCfg.size = dmaDataSize2;
-	descrCfg.arbRate = dmaArbitrate1;
+	descrCfg.arbRate = dmaArbitrate8;
 	descrCfg.hprot = 0;
 	DMA_CfgDescr(DMA_CHANNEL, true, &descrCfg);
 	DMA_CfgDescr(DMA_CHANNEL, false, &descrCfg);
@@ -286,10 +295,12 @@ void DMAConfigForADC(void)
 		false,
 		(void *)&g_primaryResultBuffer, // primary destination
 		(void *)&(ADC0->SCANDATA), // primary source
-		SCAN_ADC_CHNL_NUM - 2,
+		3,//(SCAN_ADC_DMA_LEN>>2) - 1,
+		//0,
 		(void *)&g_alterResultBuffer, // alternate destination
 		(void *)&(ADC0->SCANDATA), // alternate source
-		SCAN_ADC_CHNL_NUM - 2);
+		3//(SCAN_ADC_DMA_LEN>>2) - 1);
+	);
 }
 
 /*
@@ -334,7 +345,7 @@ void ADCConfigForScan(void)
 	scanInit.resolution = adcResOVS;   // 8-bit resolution
 	scanInit.reference = adcRef2V5;
 	//scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
-	//scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4 | ADC_SCANCTRL_INPUTMASK_CH7;
+//	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4 | ADC_SCANCTRL_INPUTMASK_CH7;
 	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4;
 	ADC_InitScan(ADC0, &scanInit);
 
@@ -416,7 +427,7 @@ void readADC(void)
 	//	temp = temp >> 7;
 
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-	precvBuf[s_index++] = ((ADC_DataSingleGet(ADC0) & 0xFFFF) >> AD_SHIFT);
+	precvBuf[s_index++] = ((ADC_DataSingleGet(ADC0) & 0x0FFF) >> AD_SHIFT);
 
 	if (s_index >= FRAME_DATA_LEN) {
 		s_index = 0;
@@ -438,30 +449,93 @@ void readADC(void)
 
 void ADC0_IRQHandler(void)
 {
-//	static uint32_t t1 = 0, s_cnt = 0;
-//	uint16_t temp = 0;
-//
-//	if (t1 == 0)
-//		t1 = g_Ticks + 500;
-//
-//	s_cnt++;
-//
-//	if (g_Ticks == t1) {
-//		s_cnt = 0;
-//		t1 = g_Ticks + 500;
-//	}
-
+	static int cnt = 0;
 	// Clear the interrupt flag
 	ADC_IntClear(ADC0, ADC_IFC_SINGLE);
-
-//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
-//	temp = temp >> 7;
+	cnt++;
 
 	readADC();
 
 	// Start next ADC conversion
 	//ADC_Start(ADC0, adcStartSingle);
 }
+
+/***************************************************************************//**
+ * @brief
+ *   Use TIMER as PRS producer for ADC trigger.
+ *
+ * @details
+ *   This example triggers an ADC conversion every time that TIMER0 overflows.
+ *   TIMER0 sends a one HFPERCLK cycle high pulse through the PRS on each
+ *   overflow and the ADC does a single conversion.
+ *
+ * @note
+ *   The ADC consumes pulse signals which is the same signal produced by the
+ *   TIMER. In this case, there is no edge detection needed, and the PRS leaves
+ *   the incoming signal unchanged.
+ ******************************************************************************/
+void prsTimerAdc(void)
+{
+
+  /* Enable necessary clocks */
+  CMU_ClockEnable(cmuClock_ADC0, true);
+  CMU_ClockEnable(cmuClock_PRS, true);
+  //CMU_ClockEnable(cmuClock_TIMER0, true);
+
+  TIMER_Init_TypeDef timerInit = TIMER_INIT_DEFAULT;
+
+  /* Initialize TIMER0 */
+  timerInit.enable = false;                     /* Do not start after init */
+  timerInit.prescale = timerPrescale8;        /* Overflow after aprox 1s */
+  TIMER_Init(TIMER0, &timerInit);
+
+  ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
+  ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
+
+  /* Init common settings for both single conversion and scan mode */
+  init.timebase = ADC_TimebaseCalc(0);
+	// Modify init structs and initialize
+	if (UWB_Default.AD_Samples == 50){
+		ADC_CLK = 867600;
+		initSingle.acqTime = adcAcqTime256;
+//		init.ovsRateSel = adcOvsRateSel64;
+	}
+	else if (UWB_Default.AD_Samples == 5000){
+		ADC_CLK = 1000000;
+		initSingle.acqTime = adcAcqTime16;
+//		init.ovsRateSel = adcOvsRateSel16;
+	}
+  init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
+  init.lpfMode = adcLPFilterDeCap;
+
+  /* Initialize ADC single sample conversion */
+  initSingle.prsSel = ADC_PRS_CH;       /* Select PRS channel */
+  initSingle.reference = adcRef2V5;     /* VDD or AVDD as ADC reference */
+  initSingle.input = adcSingleInputCh7;   /* VDD as ADC input */
+  initSingle.resolution = adcRes12Bit;   // 8-bit resolution
+//  initSingle.rep = true;
+  initSingle.prsEnable = true;          /* PRS enable */
+
+  ADC_Init(ADC0, &init);
+  ADC_InitSingle(ADC0, &initSingle);
+
+  /* Enable ADC Interrupt when Single Conversion Complete */
+  ADC_IntEnable(ADC0, ADC_IEN_SINGLE);
+  NVIC_ClearPendingIRQ(ADC0_IRQn);
+  NVIC_EnableIRQ(ADC0_IRQn);
+
+  /* Select TIMER0 as source and timer overflow as signal */
+  PRS_SourceSignalSet(PRS_ADC_CH, PRS_CH_CTRL_SOURCESEL_TIMER0, PRS_CH_CTRL_SIGSEL_TIMER0OF, prsEdgeOff);
+
+  TIMER_CounterSet(TIMER0, ADC_START_CNT);
+  TIMER_Enable(TIMER0, true);
+
+//  TIMER_Reset(TIMER0);
+//  ADC_Reset(ADC0);
+//  prsDemoExit();
+}
+
+
 
 #if ADC_DMA_ENABLE
 /*

@@ -49,6 +49,7 @@ void clockConfig(void)
 	CMU_ClockEnable(cmuClock_USART0, true);
 	CMU_ClockEnable(cmuClock_TIMER0, true);
 	CMU_ClockEnable(cmuClock_TIMER1, true);
+
 }
 
 void adc_test(void)
@@ -116,35 +117,37 @@ int main(void)
 	powerADandUWB(1);
 	g_AD_start = false;
 
+	SET_NUM = 5;
+	DEV_NUM = 3;
+	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
+	if (DEV_NUM == 1 || DEV_NUM == 2) {
+		AD_SHIFT = 4;
+		UWB_Default.AD_Samples = 50;
+	}
+
+	else if (DEV_NUM == 3 || DEV_NUM == 4) {
+		AD_SHIFT = 4;
+		UWB_Default.AD_Samples = 5000;
+	}
+
 	/*
 	 * config timer0 and timer1
 	 * */
 	timer_init();
 	Delay_ms(5);
-
+//	adc_pingpong();
 	/*
 	 * SPI master config
 	 * */
 	SPIDMAInit();
-	SET_NUM = 5;
-	DEV_NUM = 3;
-	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
-	if (DEV_NUM == 1 || DEV_NUM == 2) {
-		AD_SHIFT = 8;
-		UWB_Default.AD_Samples = 50;
-	}
 
-	else if (DEV_NUM == 3 || DEV_NUM == 4) {
-		AD_SHIFT = 8;
-		UWB_Default.AD_Samples = 5000;
-	}
 	/*
 	 * configure and start ADC via interrupt
 	 * */
 //	adc_test();
 
 	//initADC();
-	ADCConfigForScan();
+	//ADCConfigForScan();
 
 	/*
 	 * init RTC for LFRCO 32.768KHz
@@ -206,7 +209,7 @@ int main(void)
 
 			case SLAVE_RTCIDLEMODE:
 			case SLAVE_CMDIDLEMODE:
-				sleepAndRestore();
+//				sleepAndRestore();
 				break;
 
 			default:

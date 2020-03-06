@@ -231,7 +231,6 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	if (!pSampleBuf) {
 		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
 		pMainCtrlFrame->len = 0;
-		delay_us = 8000;
 	} else {
 
 		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
