@@ -13,7 +13,7 @@ volatile uint32_t g_Ticks;
  *
  * 200 * 1ms = 200ms
  * */
-#define IDLE_WKUP_TIMEOUT 200
+#define IDLE_WKUP_TIMEOUT 200*5
 volatile uint32_t g_idle_wkup_timeout;
 
 /*
@@ -22,7 +22,7 @@ volatile uint32_t g_idle_wkup_timeout;
  *
  * 300000 * 1ms = 5 minutes
  * */
-#define IDLE_CMD_TIMEOUT 300000 //300 second
+#define IDLE_CMD_TIMEOUT 300000*5 //300 second
 volatile uint32_t g_idle_cmd_timeout;
 /*
  * when it does not receive cmd in below duration since the last command,
@@ -30,7 +30,7 @@ volatile uint32_t g_idle_cmd_timeout;
  *
  * 1000 * 1ms = 1 s
  * */
-#define ADC_IDLE_CMD_TIMEOUT 1000 //300 second
+#define ADC_IDLE_CMD_TIMEOUT 1000*5 //300 second
 volatile uint32_t g_adc_idle_cmd_timeout;
 
 /*

@@ -39,7 +39,6 @@ void globalInit(void)
 
 	delay_us = 8750;
 	frm_cnt = frm_cnt_init;
-	s_index = 0;
 	slave_adc_index = 0;
 	s_index_chg = false;
 }
@@ -296,24 +295,24 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 50);
 }
 
-void Sync_Slave_Bat_Get(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame, bool getBat)
+void Sync_Slave_Bat_Get(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
 
 //	CORE_CriticalDisableIrq();
-	slave_adc_index = (g_adcSampleDataQueue.in << 6) | s_index;
 //	pollADCForBattery();
 
-	if (getBat){
-		NVIC_DisableIRQ(ADC0_IRQn);
-		pollADCForBattery();
-	}
-	else{
-		NVIC_DisableIRQ(ADC0_IRQn);
-		initADC();
-	}
+//	if (getBat){
+//		NVIC_DisableIRQ(ADC0_IRQn);
+//		pollADCForBattery();
+//	}
+//	else{
+//		NVIC_DisableIRQ(ADC0_IRQn);
+//		initADC();
+//	}
 //	CORE_CriticalEnableIrq();
-	g_idle_bat_ad_time = g_Ticks + delay_sync_ms;
-	while(g_Ticks < g_idle_bat_ad_time) ;
+	prsTimerAdc();
+//	g_idle_bat_ad_time = g_Ticks + delay_sync_ms;
+//	while(g_Ticks < g_idle_bat_ad_time) ;
 
 	dwNewReceive(dev);
 	dwStartReceive(dev);
@@ -346,12 +345,12 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 			break;
 
 		case ENUM_SLAVE_SYNC:
-			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame, false);
+			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
-		case ENUM_SLAVE_BAT:
-			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame, true);
-			break;
+//		case ENUM_SLAVE_BAT:
+//			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame, true);
+//			break;
 
 		case ENUM_SAMPLE_DATA:
 			form_sample_data_token_frame(dev, dwMacFrame, pMainCtrlFrame);

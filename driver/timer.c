@@ -11,8 +11,9 @@
 
 // Freq = 25M
 #define TOP 25000
-#define MS_COUNT  3125  //25000000 / 8 / 1000
-#define MAX_MS    20    //65535 / MS_COUNT for sleep time
+#define MS_COUNT  	 3125  //25000000 / 8 / 1000
+#define US200_COUNT  625   //25000000 / 8 / 5000
+#define MAX_MS       20    //65535 / MS_COUNT for sleep time
 
 volatile bool Timer1_overflow;
 /**************************************************************************//**
@@ -69,8 +70,7 @@ void setupTimer0(void)
 	NVIC_EnableIRQ(TIMER0_IRQn);
 
 	/* Set TIMER Top value */
-	//TIMER_TopSet(TIMER0, TOP);
-	TIMER_TopSet(TIMER0, MS_COUNT); //1 ms
+	TIMER_TopSet(TIMER0, US200_COUNT); //200 us
 
 	/* Configure TIMER */
 	TIMER_Init(TIMER0, &timerInit);
@@ -113,7 +113,6 @@ void setupTimer1(void)
 void timer_init(void)
 {
 	g_Ticks = 0;
-
 	setupTimer0();
 	setupTimer1();
 }

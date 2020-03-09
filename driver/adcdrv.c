@@ -3,6 +3,8 @@
 #include "em_adc.h"
 #include "em_cmu.h"
 #include "em_core.h"
+#include "em_prs.h"
+#include "em_timer.h"
 #include "time.h"
 #include "adcdrv.h"
 #include "dmactrl.h"
@@ -13,7 +15,11 @@
 #include "main.h"
 #include "math.h"
 
-#define ADC_DMA_ENABLE 1
+#define ADC_DMA_ENABLE 0
+/* Defines for ADC */
+#define PRS_ADC_CH      5               /* PRS channel */
+#define ADC_PRS_CH      adcPRSSELCh5
+#define ADC_START_CNT   300 	        /* First PRS TIMER trigger count */
 
 /*
  * ADC sample clock
@@ -198,7 +204,7 @@ void pollADCForBattery (void)
 
 void readADC(void)
 {
-
+	static int8_t s_index = 0;
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint8_t *precvBuf = NULL;
 
@@ -232,33 +238,96 @@ void readADC(void)
 
 void ADC0_IRQHandler(void)
 {
-//	static uint32_t t1 = 0, s_cnt = 0;
-//	uint16_t temp = 0;
-//
-//	if (t1 == 0)
-//		t1 = g_Ticks + 500;
-//
-//	s_cnt++;
-//
-//	if (g_Ticks == t1) {
-//		s_cnt = 0;
-//		t1 = g_Ticks + 500;
-//	}
-
+	static int cnt = 0;
 	// Clear the interrupt flag
 	ADC_IntClear(ADC0, ADC_IFC_SINGLE);
-
-//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
-//	temp = temp >> 7;
+	cnt++;
 
 	readADC();
 
 	// Start next ADC conversion
 	//ADC_Start(ADC0, adcStartSingle);
 }
+
+/***************************************************************************//**
+ * @brief
+ *   Use TIMER as PRS producer for ADC trigger.
+ *
+ * @details
+ *   This example triggers an ADC conversion every time that TIMER0 overflows.
+ *   TIMER0 sends a one HFPERCLK cycle high pulse through the PRS on each
+ *   overflow and the ADC does a single conversion.
+ *
+ * @note
+ *   The ADC consumes pulse signals which is the same signal produced by the
+ *   TIMER. In this case, there is no edge detection needed, and the PRS leaves
+ *   the incoming signal unchanged.
+ ******************************************************************************/
+void prsTimerAdc(void)
+{
+
+  /* Enable necessary clocks */
+//  CMU_ClockEnable(cmuClock_ADC0, true);
+//  CMU_ClockEnable(cmuClock_PRS, true);
+  //CMU_ClockEnable(cmuClock_TIMER0, true);
+
+//  TIMER_Init_TypeDef timerInit = TIMER_INIT_DEFAULT;
+//
+//  /* Initialize TIMER0 */
+//  timerInit.enable = false;                     /* Do not start after init */
+//  timerInit.prescale = timerPrescale8;        /* Overflow after aprox 1s */
+//  TIMER_Init(TIMER0, &timerInit);
+
+  TIMER_Enable(TIMER0, false);
+
+  ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
+  ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
+
+  /* Init common settings for both single conversion and scan mode */
+  init.timebase = ADC_TimebaseCalc(0);
+	// Modify init structs and initialize
+	if (UWB_Default.AD_Samples == 50){
+		ADC_CLK = 867600;
+		initSingle.acqTime = adcAcqTime256;
+//		init.ovsRateSel = adcOvsRateSel64;
+	}
+	else if (UWB_Default.AD_Samples == 5000){
+		ADC_CLK = 1000000;
+		initSingle.acqTime = adcAcqTime16;
+//		init.ovsRateSel = adcOvsRateSel16;
+	}
+  init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
+  init.lpfMode = adcLPFilterDeCap;
+
+  /* Initialize ADC single sample conversion */
+  initSingle.prsSel = ADC_PRS_CH;       /* Select PRS channel */
+  initSingle.reference = adcRef2V5;     /* VDD or AVDD as ADC reference */
+  initSingle.input = adcSingleInputCh7;   /* VDD as ADC input */
+  initSingle.resolution = adcRes12Bit;   // 8-bit resolution
+//  initSingle.rep = true;
+  initSingle.prsEnable = true;          /* PRS enable */
+
+  ADC_Init(ADC0, &init);
+  ADC_InitSingle(ADC0, &initSingle);
+
+  /* Enable ADC Interrupt when Single Conversion Complete */
+  ADC_IntEnable(ADC0, ADC_IEN_SINGLE);
+  NVIC_ClearPendingIRQ(ADC0_IRQn);
+  NVIC_EnableIRQ(ADC0_IRQn);
+
+  /* Select TIMER0 as source and timer overflow as signal */
+  PRS_SourceSignalSet(PRS_ADC_CH, PRS_CH_CTRL_SOURCESEL_TIMER0, PRS_CH_CTRL_SIGSEL_TIMER0OF, prsEdgeOff);
+
+  TIMER_CounterSet(TIMER0, ADC_START_CNT);
+  TIMER_Enable(TIMER0, true);
+
+//  TIMER_Reset(TIMER0);
+//  ADC_Reset(ADC0);
+//  prsDemoExit();
+}
+
 void ADC0_Reset(void){
 	ADC_Reset(ADC0);
-	s_index = 0;
 	g_adcSampleDataQueue.in = 0;
 	g_adcSampleDataQueue.out = 0;
 	g_adcSampleDataQueue.samples = 0;

@@ -20,9 +20,8 @@
 void clockConfig(void)
 {
 	CMU_ClockEnable(cmuClock_GPIO, true);
-	CMU_ClockEnable(cmuClock_TIMER0, true);
 	CMU_ClockEnable(cmuClock_TIMER1, true);
-	timer_init();
+	setupTimer1();
 	Delay_ms(5);
 	GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
 	Delay_ms(5);
@@ -49,6 +48,9 @@ void clockConfig(void)
 	CMU_ClockEnable(cmuClock_USART0, true);
 	CMU_ClockEnable(cmuClock_TIMER0, true);
 	CMU_ClockEnable(cmuClock_TIMER1, true);
+	CMU_ClockEnable(cmuClock_DMA,  true);
+	CMU_ClockEnable(cmuClock_ADC0, true);
+	CMU_ClockEnable(cmuClock_PRS, true);
 }
 
 void adc_test(void)
@@ -63,39 +65,8 @@ void adc_test(void)
 	}
 }
 
-void rtc_test(void)
-{
-	RtcSetup();
-	while (1) {
-		//EMU_EnterEM2(false);
-		Delay_ms(1000);
-//		SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
-//		SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
-//		__WFI();
-		EMU_EnterEM2(true);
-		RtcSetup();
-	}
-}
-
-//int main1(void)
-//{
-//	/* Chip errata */
-//	CHIP_Init();
-//
-//	clockConfig();
-//
-//	timer_init();
-//	Delay_ms(8000);
-//
-//	rtc_test();
-//}
-//extern volatile int g_cnt;
-//extern int p_cnt;
 int main(void)
 {
-
-//	uint32_t l_cnt = 0;
-//	uint32_t m_cnt = 0;
 
 	/* Chip errata */
 	CHIP_Init();
@@ -105,22 +76,6 @@ int main(void)
 	 * */
 	clockConfig();
 
-	/*
-	 * power up UWB, power down AD
-	 * */
-	powerADandUWB(0);
-	g_AD_start = false;
-
-	/*
-	 * config timer0 and timer1
-	 * */
-	timer_init();
-	Delay_ms(5);
-
-	/*
-	 * SPI master config
-	 * */
-	SPIDMAInit();
 	SET_NUM = 5;
 	DEV_NUM = 4;
 	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
@@ -154,8 +109,20 @@ int main(void)
 	 * */
 	globalInit();
 	/*
-	 * configure and start ADC via interrupt
+	 * config timer0 and timer1
 	 * */
+	timer_init();
+	Delay_ms(5);
+	prsTimerAdc();
+	while(1){
+		;
+	}
+
+	/*
+	 * SPI master config
+	 * */
+	SPIDMAInit();
+
 	//adc_test();
 
 	//initADC();
@@ -164,7 +131,13 @@ int main(void)
 	 * init RTC for LFRCO 32.768KHz
 	 * */
 	RtcSetup();
-//	rtc_test();
+
+	/*
+	 * power up UWB, power down AD
+	 * */
+	powerADandUWB(0);
+	g_AD_start = false;
+	Delay_ms(5);
 	/*
 	 * DW1000 wireless device init, to do.
 	 * */
