@@ -17,6 +17,7 @@
  * slave device ID 0x0 - 0x3 *
  * */
 int8_t SLAVE_ID = 0x0;
+bool free_frm_status = false;
 
 devInfo_t g_devInfo = {
 		.devId = SLAVE_ADDR1,
@@ -24,7 +25,7 @@ devInfo_t g_devInfo = {
 		.srcId = SLAVE_ADDR1,
 };
 
-volatile uint8_t g_slaveStatus = 0;
+
 
 void globalInit(void)
 {
@@ -41,6 +42,8 @@ void globalInit(void)
 	frm_cnt = frm_cnt_init;
 	slave_adc_index = 0;
 	s_index_chg = false;
+	free_frm_status = false;
+	g_dataRecv_time = 0;
 }
 
 void sleepAndRestore(void)
@@ -80,11 +83,11 @@ void sleepAndRestore(void)
 	 * power up external crystal oscillator.
 	 * */
 	GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
-	Delay_ms(5);
+	Delay_ms(2);
 	CMU_OscillatorEnable(cmuOsc_HFXO, true, true);
 	CMU_ClockSelectSet(cmuClock_HF, cmuSelect_HFXO);
 	CMU_OscillatorEnable(cmuOsc_HFRCO, false, false);
-	Delay_ms(5);
+	Delay_ms(2);
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 1);
 	Delay_ms(2);
 	GPIO_PinModeSet(gpioPortC, 13, gpioModePushPull, 0);
@@ -98,7 +101,7 @@ void sleepAndRestore(void)
 	dwDeviceInit(&g_dwDev);
 	Delay_ms(2);
 //	UDELAY_Calibrate();
-//	Delay_ms(2);
+//	Delay_ms(5);
 	/*
 	 * reset g_idle_wkup_timeout duration upon bootup.
 	 * */
@@ -229,11 +232,6 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint16_t data_crc;
 
-	if ((g_recvSlaveFr.frameType & 0x80) == 0x00)
-		delay_us = 8750;
-	else
-		delay_us = delay_sync_us;
-
 	pMainCtrlFrame->frameType = ENUM_SAMPLE_DATA_TOKEN;
 	//adc_index = pMainCtrlFrame->adcIndex;
 
@@ -242,11 +240,13 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	if (!pSampleBuf) {
 		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
 		pMainCtrlFrame->len = 0;
+		free_frm_status = true;
 		//delay_us = 8500;
 	} else {
 		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
 		pMainCtrlFrame->len = FRAME_LEN;
 		frm_cnt++;
+		free_frm_status = false;
 		/*
 		 * update sampled battery voltage
 		 * */
@@ -259,7 +259,54 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, delay_us);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8750);
+	g_dataRecv_time = g_Ticks;
+}
+
+void form_repeat_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
+{
+	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+	uint16_t data_crc;
+	uint32_t times;
+
+	times = g_Ticks - g_dataRecv_time;
+	pMainCtrlFrame->frameType = ENUM_REPEAT_DATA_TOKEN;
+	//adc_index = pMainCtrlFrame->adcIndex;
+	if (times <= 18 && (!free_frm_status)){
+		if (g_adcSampleDataQueue.out == 0)
+			g_adcSampleDataQueue.out = Q_LEN - 1;
+		else
+			g_adcSampleDataQueue.out--;
+
+		if (g_adcSampleDataQueue.samples < Q_LEN - 1)
+			g_adcSampleDataQueue.samples++;
+	}
+	pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
+
+	if (!pSampleBuf) {
+		memset(pMainCtrlFrame->data, 0xff, FRAME_DATA_LEN);
+		pMainCtrlFrame->len = 0;
+		//delay_us = 8500;
+	} else {
+		memcpy(pMainCtrlFrame->data, &pSampleBuf->adc_sample_buffer[0], FRAME_DATA_LEN);
+		pMainCtrlFrame->len = FRAME_LEN;
+		if (times > 18 || free_frm_status){
+			frm_cnt++;
+		}
+
+		/*
+		 * update sampled battery voltage
+		 * */
+		//delay_us = 8500;
+	}
+	pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
+	pMainCtrlFrame->adcIndex = slave_adc_index;
+	pMainCtrlFrame->serial = frm_cnt;
+	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
+	pMainCtrlFrame->crc0 = data_crc & 0xff;
+	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
+
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8750);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -297,26 +344,14 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 
 void Sync_Slave_Bat_Get(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
-
-//	CORE_CriticalDisableIrq();
-//	pollADCForBattery();
-
-//	if (getBat){
-//		NVIC_DisableIRQ(ADC0_IRQn);
-//		pollADCForBattery();
-//	}
-//	else{
-//		NVIC_DisableIRQ(ADC0_IRQn);
-//		initADC();
-//	}
-//	CORE_CriticalEnableIrq();
-	prsTimerAdc();
-//	g_idle_bat_ad_time = g_Ticks + delay_sync_ms;
-//	while(g_Ticks < g_idle_bat_ad_time) ;
-
+	//int ADC_calibration_value = 0;
+	CORE_CriticalDisableIrq();
+		pollADCForBattery();
+		//ADC_calibration_value = ADC_Calibration(ADC0, adcRef2V5);
+		prsTimerAdc();
+	CORE_CriticalEnableIrq();
 	dwNewReceive(dev);
 	dwStartReceive(dev);
-	g_dataRecvDone = false;
 }
 
 //int p_cnt=0;
@@ -348,12 +383,12 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
-//		case ENUM_SLAVE_BAT:
-//			Sync_Slave_Bat_Get(dev, dwMacFrame, pMainCtrlFrame, true);
-//			break;
-
 		case ENUM_SAMPLE_DATA:
 			form_sample_data_token_frame(dev, dwMacFrame, pMainCtrlFrame);
+			break;
+
+		case ENUM_REPEAT_DATA:
+			form_repeat_data_token_frame(dev, dwMacFrame, pMainCtrlFrame);
 			break;
 
 		case ENUM_SLAVE_STATUS:
@@ -374,6 +409,7 @@ int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame)
 		default:
 			break;
 	}
+
 
 	//CORE_CriticalDisableIrq();
 	if (g_ReceivedPacketQueue.len == 0) {

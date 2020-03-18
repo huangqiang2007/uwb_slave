@@ -1693,7 +1693,7 @@ void dwGpioInterruptConfig(dwDevice_t *dev)
 	 CMU_ClockEnable(cmuClock_GPIO, true);
 	 GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 1);
 	 NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
-	 NVIC_SetPriority(GPIO_ODD_IRQn,15);
+	 NVIC_SetPriority(GPIO_ODD_IRQn,1);
 	 NVIC_EnableIRQ(GPIO_ODD_IRQn);
 	 GPIO_ExtIntConfig(gpioPortB, gpioPortB_11, gpioPortB_11, true, false, true);
 }
@@ -1738,17 +1738,19 @@ void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_tim
 
 void dwRecvData(dwDevice_t *dev)
 {
-	int len = 0;
+	int len = sizeof(g_recvSlaveFr);
 
 	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
-	len = dwGetDataLength(dev);
+
+//	len = dwGetDataLength(dev);
 
 //	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
 //	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
-
+//	g_dataRecvDone = true;
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
 	if ((((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) || ((g_recvSlaveFr.frameCtrl & 0xff) == 0x00)) && (((g_recvSlaveFr.frameType & 0x0f) % 2)== 1)){
+
 		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
 		//g_dataRecvDone = true;
 //		if(g_recvSlaveFr.frameType == 0x03){
@@ -1760,6 +1762,8 @@ void dwRecvData(dwDevice_t *dev)
 		dwStartReceive(dev);
 		//g_dataRecvDone = false;
 	}
+//	dwNewReceive(dev);
+//	dwStartReceive(dev);
 }
 
 void dwSentData(dwDevice_t *dev)
@@ -1793,7 +1797,8 @@ void dwReceiveFailed(dwDevice_t *dev)
 //		dwStartReceive(dev);
 //		g_dataRecvDone = false;
 //	}
+//	g_dataRecvFail_cnt++;
 	dwNewReceive(dev);
 	dwStartReceive(dev);
-	g_dataRecvDone = false;
+
 }

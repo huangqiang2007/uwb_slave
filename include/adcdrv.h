@@ -44,5 +44,8 @@ ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue);
 void pollADCForBattery (void);
 void ADC0_Reset(void);
 void prsTimerAdc(void);
+void collectSamples(uint16_t dataBuf[]);
+uint32_t ADC_Calibration(ADC_TypeDef *adc, ADC_Ref_TypeDef ref);
+void readADC(void);
 
 #endif /* ADCDRV_H_ */

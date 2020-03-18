@@ -25,9 +25,9 @@ void TIMER0_IRQHandler(void)
 {
 	/* Clear flag for TIMER0 overflow interrupt */
 	TIMER_IntClear(TIMER0, TIMER_IF_OF);
-	g_Ticks++;
-	if (g_Ticks > 0xFFFFFFF0 - IDLE_CMD_TIMEOUT)
-		g_Ticks = 0;
+//	g_Ticks++;
+//	if (g_Ticks > 0xFFFFFFF0 - IDLE_CMD_TIMEOUT)
+//		g_Ticks = 0;
 }
 
 /**************************************************************************//**
@@ -38,7 +38,10 @@ void TIMER1_IRQHandler(void)
 {
 	/* Clear flag for TIMER0 overflow interrupt */
 	TIMER_IntClear(TIMER1, TIMER_IF_OF);
-	Timer1_overflow = true;
+//	Timer1_overflow = true;
+	g_Ticks++;
+	if (g_Ticks > 0xFFFFFFF0 - IDLE_CMD_TIMEOUT)
+		g_Ticks = 0;
 }
 
 
@@ -67,7 +70,7 @@ void setupTimer0(void)
 	TIMER_IntEnable(TIMER0, TIMER_IF_OF);
 
 	/* Enable TIMER0 interrupt vector in NVIC */
-	NVIC_EnableIRQ(TIMER0_IRQn);
+//	NVIC_EnableIRQ(TIMER0_IRQn);
 
 	/* Set TIMER Top value */
 	TIMER_TopSet(TIMER0, US200_COUNT); //200 us
@@ -93,21 +96,23 @@ void setupTimer1(void)
 		.mode       = timerModeUp,
 		.dmaClrAct  = false,
 		.quadModeX4 = false,
-		.oneShot    = true,
+		.oneShot    = false,
 		.sync       = false,
 	};
-
 	/* Enable overflow interrupt */
 	TIMER_IntEnable(TIMER1, TIMER_IF_OF);
 
-	/* Enable TIMER0 interrupt vector in NVIC */
+	/* Enable TIMER1 interrupt vector in NVIC */
 	NVIC_EnableIRQ(TIMER1_IRQn);
 
+	TIMER_CounterSet(TIMER1, 0);
 	/* Set TIMER Top value */
-	//TIMER_TopSet(TIMER1, 3125);
+	TIMER_TopSet(TIMER1, MS_COUNT);
 
 	/* Configure TIMER */
 	TIMER_Init(TIMER1, &timerInit);
+
+	TIMER_Enable(TIMER1, true);
 }
 
 void timer_init(void)
@@ -127,34 +132,45 @@ void Delay_us(uint32_t us)
 }
 
 /* max 20ms */
-void __Delay_ms(uint32_t ms)
-{
-	Timer1_overflow = false;
-
-	/* Set TIMER value */
-	TIMER_CounterSet(TIMER1, 0);
-	/* Set TIMER Top value */
-	TIMER_TopSet(TIMER1, MS_COUNT * ms);
-	/* Enable TIMER */
-	TIMER_Enable(TIMER1, true);
-
-	while (Timer1_overflow == false);
-	/* Disable TIMER */
-	TIMER_Enable(TIMER1, false);
-}
+//void __Delay_ms(uint32_t ms)
+//{
+//	Timer1_overflow = false;
+//
+//	/* Set TIMER value */
+//	TIMER_CounterSet(TIMER1, 0);
+//	/* Set TIMER Top value */
+//	TIMER_TopSet(TIMER1, MS_COUNT * ms);
+//	/* Enable TIMER */
+//	TIMER_Enable(TIMER1, true);
+//
+//	while (Timer1_overflow == false);
+//	/* Disable TIMER */
+//	TIMER_Enable(TIMER1, false);
+//}
 
 void Delay_ms(uint32_t ms)
 {
-	if (ms < MAX_MS) {
-		__Delay_ms(ms);
-		return;
-	}
+	uint32_t g_wait_timeout;
+	g_Ticks = 0;
+	g_wait_timeout = g_Ticks + ms;
 
-	int n = ms / MAX_MS;
-	while(n-- > 0) {
-		__Delay_ms(MAX_MS);
+	while (g_Ticks < g_wait_timeout){
+		;
 	}
-
-	if (ms % MAX_MS > 0)
-		__Delay_ms(ms % MAX_MS);
 }
+
+//void Delay_ms(uint32_t ms)
+//{
+//	if (ms < MAX_MS) {
+//		__Delay_ms(ms);
+//		return;
+//	}
+//
+//	int n = ms / MAX_MS;
+//	while(n-- > 0) {
+//		__Delay_ms(MAX_MS);
+//	}
+//
+//	if (ms % MAX_MS > 0)
+//		__Delay_ms(ms % MAX_MS);
+//}

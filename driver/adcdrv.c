@@ -13,9 +13,12 @@
 #include "libdw1000.h"
 #include "timer.h"
 #include "main.h"
+#include "adc_ping_pong.h"
 #include "math.h"
 
 #define ADC_DMA_ENABLE 0
+#define ADC_INT_ENABLE 1
+#define ADC_PRS_ENABLE 1
 /* Defines for ADC */
 #define PRS_ADC_CH      5               /* PRS channel */
 #define ADC_PRS_CH      adcPRSSELCh5
@@ -29,7 +32,7 @@
 /*
  * drop several samples before ADC is stable.
  * */
-#define ADC_IGNORE_CNT 5
+//#define ADC_IGNORE_CNT 5
 
 DMA_CB_TypeDef dma_adc_cb;
 int ADC_CLK = 0;
@@ -100,6 +103,8 @@ ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue)
 	return pSampleBuf;
 }
 
+
+#if ADC_INT_ENABLE
 void initADC (void)
 {
 	ADC_Reset(ADC0);
@@ -149,57 +154,18 @@ void initADC (void)
 	ADC_Start(ADC0, adcStartSingle);
 }
 
-void pollADCForBattery (void)
+
+void ADC0_IRQHandler(void)
 {
-	uint32_t sample;
-	float vol = 0.0;
+//	static int cnt = 0;
+	// Clear the interrupt flag
+	ADC_IntClear(ADC0, ADC_IFC_SINGLE);
+//	cnt++;
 
-	ADC_Reset(ADC0);
+	readADC();
 
-	// Enable ADC0 clock
-	CMU_ClockEnable(cmuClock_ADC0, true);
-
-	// Declare init structs
-	ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
-	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
-
-	// Modify init structs and initialize
-	init.prescale = ADC_PrescaleCalc(500000, 0); // Init to max ADC clock for Series 0
-
-	initSingle.diff       = false;        // single ended
-	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
-	initSingle.resolution = adcRes8Bit;  // 12-bit resolution
-	initSingle.acqTime = adcAcqTime4;
-
-	// Select ADC input. See README for corresponding EXP header pin.
-	initSingle.input = adcSingleInputCh7;
-	init.timebase = ADC_TimebaseCalc(0);
-
-	ADC_Init(ADC0, &init);
-	ADC_InitSingle(ADC0, &initSingle);
-
-	// Start ADC conversion
-	ADC_Start(ADC0, adcStartSingle);
-
-	// Wait for conversion to be complete
-	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK));
-
-	// Get ADC result
-	sample = ADC_DataSingleGet(ADC0);
-
-	vol = (float)(sample * 5.0 / 256);
-
-	if (vol > 3.7) vol = 3.7;
-	else if (vol < 3.0) vol = 3.01;
-
-	if (vol > 3.0)
-		g_batteryVol = ((vol - 3.0) * 100 + 6) / 7;
-
-	/*
-	 * re-init ADC for sensor sample
-	 * */
-	initADC();
-
+	// Start next ADC conversion
+	//ADC_Start(ADC0, adcStartSingle);
 }
 
 void readADC(void)
@@ -214,7 +180,7 @@ void readADC(void)
 	//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
 	//	temp = temp >> 7;
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 8;
+	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 4;
 
 	/*
 	 * poll battery voltage every 1 second
@@ -235,20 +201,10 @@ void readADC(void)
 
 	}
 }
+#endif
 
-void ADC0_IRQHandler(void)
-{
-	static int cnt = 0;
-	// Clear the interrupt flag
-	ADC_IntClear(ADC0, ADC_IFC_SINGLE);
-	cnt++;
 
-	readADC();
-
-	// Start next ADC conversion
-	//ADC_Start(ADC0, adcStartSingle);
-}
-
+#if ADC_PRS_ENABLE
 /***************************************************************************//**
  * @brief
  *   Use TIMER as PRS producer for ADC trigger.
@@ -278,6 +234,7 @@ void prsTimerAdc(void)
 //  timerInit.prescale = timerPrescale8;        /* Overflow after aprox 1s */
 //  TIMER_Init(TIMER0, &timerInit);
 
+  ADC0_Reset();
   TIMER_Enable(TIMER0, false);
 
   ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
@@ -286,31 +243,32 @@ void prsTimerAdc(void)
   /* Init common settings for both single conversion and scan mode */
   init.timebase = ADC_TimebaseCalc(0);
 	// Modify init structs and initialize
-	if (UWB_Default.AD_Samples == 50){
-		ADC_CLK = 867600;
-		initSingle.acqTime = adcAcqTime256;
-//		init.ovsRateSel = adcOvsRateSel64;
-	}
-	else if (UWB_Default.AD_Samples == 5000){
+//	if (UWB_Default.AD_Samples == 50){
+//		ADC_CLK = 867600;
+//		initSingle.acqTime = adcAcqTime256;
+////		init.ovsRateSel = adcOvsRateSel64;
+//	}
+//	else if (UWB_Default.AD_Samples == 5000){
 		ADC_CLK = 1000000;
 		initSingle.acqTime = adcAcqTime16;
 //		init.ovsRateSel = adcOvsRateSel16;
-	}
+//	}
   init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
   init.lpfMode = adcLPFilterDeCap;
 
   /* Initialize ADC single sample conversion */
   initSingle.prsSel = ADC_PRS_CH;       /* Select PRS channel */
   initSingle.reference = adcRef2V5;     /* VDD or AVDD as ADC reference */
-  initSingle.input = adcSingleInputCh7;   /* VDD as ADC input */
+  initSingle.input = adcSingleInputCh4;   /* VDD as ADC input */
   initSingle.resolution = adcRes12Bit;   // 8-bit resolution
-//  initSingle.rep = true;
+//  initSingle.resolution = adcResOVS;   // 8-bit resolution
   initSingle.prsEnable = true;          /* PRS enable */
 
   ADC_Init(ADC0, &init);
   ADC_InitSingle(ADC0, &initSingle);
 
   /* Enable ADC Interrupt when Single Conversion Complete */
+  NVIC_SetPriority(ADC0_IRQn, 0);
   ADC_IntEnable(ADC0, ADC_IEN_SINGLE);
   NVIC_ClearPendingIRQ(ADC0_IRQn);
   NVIC_EnableIRQ(ADC0_IRQn);
@@ -326,6 +284,38 @@ void prsTimerAdc(void)
 //  prsDemoExit();
 }
 
+//void collectSamples(uint16_t dataBuf[])
+//{
+//	static int8_t s_index = 0;
+////	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+////	uint8_t *precvBuf = NULL;
+////	float vol = 0.0;
+//
+////	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
+////	if (!pSampleBuf)
+////		return;
+////
+////	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
+////	for (int i=0;i<FRAME_DATA_LEN;i++){
+////		precvBuf[i] = (dataBuf[i] & 0xFFFF) >> 4;
+////	}
+//
+//	for (int i=0;i<ADCSAMPLES;i++){
+//		g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[s_index*ADCSAMPLES+i] = (dataBuf[i] & 0xFFFF) >> 4;
+//		//g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[i] = (dataBuf[i] & 0xFFFF) >> 4;
+//	}
+//	s_index++;
+////	precvBuf = NULL;
+//	if (s_index == 8){
+//		s_index = 0;
+//		g_adcSampleDataQueue.samples++;
+//		g_adcSampleDataQueue.in++;
+//		if (g_adcSampleDataQueue.in == Q_LEN)
+//			g_adcSampleDataQueue.in = 0;
+//	}
+//}
+#endif
+
 void ADC0_Reset(void){
 	ADC_Reset(ADC0);
 	g_adcSampleDataQueue.in = 0;
@@ -336,181 +326,6 @@ void ADC0_Reset(void){
 	}
 }
 
-#if ADC_DMA_ENABLE
-/*
- * @brief
- *   Configure ADC for scan mode.
- * */
-void ADCConfig(void)
-{
-	ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
-	ADC_InitScan_TypeDef scanInit = ADC_INITSCAN_DEFAULT;
-
-	CMU_ClockEnable(cmuClock_ADC0, true);
-
-	/*
-	* Init common issues for both single conversion and scan mode
-	* */
-	init.timebase = ADC_TimebaseCalc(0);
-	init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
-	init.ovsRateSel = _ADC_CTRL_OVSRSEL_X32;
-	ADC_Init(ADC0, &init);
-
-	/*
-	* Init for scan sequence use: 7 AD sample channels
-	* */
-	scanInit.rep = false;
-	scanInit.reference = adcRef2V5;
-	scanInit.resolution = _ADC_SINGLECTRL_RES_8BIT;
-
-	/*
-	 * to do?
-	 * */
-	scanInit.input = ADC_SCANCTRL_INPUTMASK_CH4;
-	ADC_InitScan(ADC0, &scanInit);
-
-	/*
-	 * init sample queue with all zero
-	 * */
-	memset((void *)&g_adcSampleDataQueue, 0x00, sizeof(g_adcSampleDataQueue));
-}
-
-void DMA_ADC_callback(unsigned int channel, bool primary, void *user)
-{
-	static uint8_t drop_cnt = 0;
-	uint8_t *precvBuf = NULL;
-
-	/*
-	 * drop first some samples since it's likely ADC
-	 * is unstable during warming up phase.
-	 * */
-	if (drop_cnt < ADC_IGNORE_CNT) {
-		drop_cnt++;
-		goto out;
-	}
-
-	g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
-	g_adcSampleDataQueue.in++;
-	if (g_adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM)
-		g_adcSampleDataQueue.in = 0;
-
-	precvBuf = (&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
-
-out:
-	/* Re-activate the DMA */
-	DMA_RefreshPingPong(channel,
-						primary,
-						false,
-						(void *)precvBuf,
-						(void *)&(ADC0->SCANDATA),
-						ADC_CHNL_NUM - 1,
-						false);
-
-	ADC_Start(ADC0, adcStartScan);
-}
-
-/*
- *@brief
- *   Configure DMA usage for this application.
- * */
-void DMAConfig(void)
-{
-	DMA_Init_TypeDef dmaInit;
-	DMA_CfgDescr_TypeDef descrCfg;
-	DMA_CfgChannel_TypeDef chnlCfg;
-
-	CMU_ClockEnable(cmuClock_DMA, true);
-
-	/*
-	* Configure general DMA issues
-	* */
-	dmaInit.hprot = 0;
-	dmaInit.controlBlock = dmaControlBlock;
-	DMA_Init(&dmaInit);
-
-	/*
-	* Configure DMA channel used
-	* */
-	dma_adc_cb.cbFunc = DMA_ADC_callback;
-	dma_adc_cb.userPtr = (void *)&g_adcSampleDataQueue;
-
-	chnlCfg.highPri = false;
-	chnlCfg.enableInt = true;
-	chnlCfg.select = DMAREQ_ADC0_SCAN;
-	chnlCfg.cb = &dma_adc_cb;
-	DMA_CfgChannel(ADC_SCAN_DMA_CH, &chnlCfg);
-
-	/*
-	* one byte per transfer
-	* */
-	descrCfg.dstInc = dmaDataInc1;
-	descrCfg.srcInc = dmaDataIncNone;
-	descrCfg.size = dmaDataSize1;
-	descrCfg.arbRate = dmaArbitrate1;
-	descrCfg.hprot = 0;
-	DMA_CfgDescr(ADC_SCAN_DMA_CH, true, &descrCfg);
-	DMA_CfgDescr(ADC_SCAN_DMA_CH, false, &descrCfg);
-
-	// Start DMA
-	DMA_ActivatePingPong(
-		ADC_SCAN_DMA_CH,
-		false,
-		(void *)&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in], // primary destination
-		(void *)&(ADC0->SCANDATA), // primary source
-		ADC_CHNL_NUM - 1,
-		(void *)&g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in], // alternate destination
-		(void *)&(ADC0->SCANDATA), // alternate source
-		ADC_CHNL_NUM - 1);
-}
-
-void ADCStart(void)
-{
-	//ADCConfig();
-	//DMAConfig();
-	initADC();
-
-	/*
-	 * Start Scan
-	 * */
-	//ADC_Start(ADC0, adcStartScan);
-}
-#endif
-
-#if ADC_DMA_ENABLE
-void ADCPoll(void)
-{
-	static int8_t s_index = 0;
-	uint8_t *precvBuf = NULL;
-
-	if (UWB_Default.subnode_id == 3 || UWB_Default.subnode_id == 4) {
-		if (s_index > FRAME_DATA_LEN) {
-			s_index = 0;
-			g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
-			g_adcSampleDataQueue.in++;
-			if (g_adcSampleDataQueue.in == Q_LEN)
-				g_adcSampleDataQueue.in = 0;
-		}
-	} else {
-		g_adcSampleDataQueue.out = g_adcSampleDataQueue.in;
-		g_adcSampleDataQueue.in++;
-		if (g_adcSampleDataQueue.in == Q_LEN)
-			g_adcSampleDataQueue.in = 0;
-	}
-	precvBuf = &(g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[0]);
-
-	// Start ADC conversion
-	ADC_Start(ADC0, adcStartSingle);
-
-	// Wait for conversion to be complete
-	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK));
-
-	// Get ADC result
-	if (UWB_Default.subnode_id == 3 || UWB_Default.subnode_id == 4)
-		precvBuf[s_index++] = ADC_DataSingleGet(ADC0);
-	else
-		precvBuf[0] = ADC_DataSingleGet(ADC0);
-}
-#else
 void ADCPoll(void)
 {
 	uint8_t *precvBuf = NULL;
@@ -520,7 +335,7 @@ void ADCPoll(void)
 	if (g_adcSampleDataQueue.in == ADC_SAMPLE_BUFFER_NUM)
 		g_adcSampleDataQueue.in = 0;
 
-	precvBuf = &(g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
+	precvBuf = (uint8_t *)&(g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in]);
 
 	// Start ADC conversion
 	ADC_Start(ADC0, adcStartSingle);
@@ -531,4 +346,225 @@ void ADCPoll(void)
 	// Get ADC result
 	precvBuf[0] = ADC_DataSingleGet(ADC0);
 }
-#endif
+
+void pollADCForBattery (void)
+{
+	uint32_t sample;
+	float vol = 0.0;
+//	ADC_Reset(ADC0);
+	// Enable ADC0 clock
+//	CMU_ClockEnable(cmuClock_ADC0, true);
+
+	// Declare init structs
+	ADC_Init_TypeDef init = ADC_INIT_DEFAULT;
+	ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
+
+	// Modify init structs and initialize
+	init.prescale = ADC_PrescaleCalc(1000000, 0); // Init to max ADC clock for Series 0
+
+	initSingle.diff       = false;        // single ended
+	initSingle.reference  = adcRef2V5;    // internal 2.5V reference
+	initSingle.resolution = adcRes8Bit;  // 12-bit resolution
+	initSingle.acqTime = adcAcqTime16;
+
+	// Select ADC input. See README for corresponding EXP header pin.
+	initSingle.input = adcSingleInputCh7;
+	init.timebase = ADC_TimebaseCalc(0);
+
+	ADC_Init(ADC0, &init);
+	ADC_InitSingle(ADC0, &initSingle);
+
+	// Start ADC conversion
+	ADC_Start(ADC0, adcStartSingle);
+
+	// Wait for conversion to be complete
+	while(!(ADC0->STATUS & _ADC_STATUS_SINGLEDV_MASK));
+
+	// Get ADC result
+	sample = ADC_DataSingleGet(ADC0);
+
+	vol = (float)(sample * 5.0 / 256);
+
+	if (vol > 3.7) vol = 3.7;
+	else if (vol < 3.0) vol = 3.01;
+
+	if (vol > 3.0)
+		g_batteryVol = ((vol - 3.0) * 100 + 6) / 7;
+
+	/*
+	 * re-init ADC for sensor sample
+	 * */
+//	initADC();
+}
+
+/***************************************************************************//**
+ * @brief
+ *   Calibrate ADC offset and gain for the specified reference.
+ *   Supports currently only single ended gain calibration.
+ *   Could easily be expanded to support differential gain calibration.
+ *
+ * @details
+ *   The offset calibration routine measures 0 V with the ADC, and adjust
+ *   the calibration register until the converted value equals 0.
+ *   The gain calibration routine needs an external reference voltage equal
+ *   to the top value for the selected reference. For example if the 2.5 V
+ *   reference is to be calibrated, the external supply must also equal 2.5V.
+ *
+ * @param[in] adc
+ *   Pointer to ADC peripheral register block.
+ *
+ * @param[in] ref
+ *   Reference used during calibration. Can be both external and internal
+ *   references.
+ *
+ * @return
+ *   The final value of the calibration register, note that the calibration
+ *   register gets updated with this value during the calibration.
+ *   No need to load the calibration values after the function returns.
+ ******************************************************************************/
+//uint32_t ADC_Calibration(ADC_TypeDef *adc, ADC_Ref_TypeDef ref)
+//{
+//  int32_t  sample;
+//  uint32_t cal;
+//
+//  /* Binary search variables */
+//  uint8_t high;
+//  uint8_t mid;
+//  uint8_t low;
+//
+//  /* Reset ADC to be sure we have default settings and wait for ongoing */
+//  /* conversions to be complete. */
+//  ADC_Reset(adc);
+//
+//  ADC_Init_TypeDef       init       = ADC_INIT_DEFAULT;
+//  ADC_InitSingle_TypeDef singleInit = ADC_INITSINGLE_DEFAULT;
+//
+//  /* Init common issues for both single conversion and scan mode */
+//  init.timebase = ADC_TimebaseCalc(0);
+//  /* Might as well finish conversion as quickly as possibly since polling */
+//  /* for completion. */
+//  /* Set ADC clock to 7 MHz, use default HFPERCLK */
+//  ADC_CLK = 1000000;
+//  init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
+//
+//  /* Set an oversampling rate for more accuracy */
+//  init.ovsRateSel = adcOvsRateSel4096;
+//  /* Leave other settings at default values */
+//  ADC_Init(adc, &init);
+//
+//  /* Init for single conversion use, measure diff 0 with selected reference. */
+//  singleInit.reference = adcRef2V5;
+//  singleInit.input     = adcSingleInputCh4;
+//  singleInit.acqTime   = adcAcqTime16;
+//  singleInit.diff      = false;
+//  /* Enable oversampling rate */
+//  singleInit.resolution = adcResOVS;
+//
+//  ADC_InitSingle(adc, &singleInit);
+//
+//  /* ADC is now set up for offset calibration */
+//  /* Offset calibration register is a 7 bit signed 2's complement value. */
+//  /* Use unsigned indexes for binary search, and convert when calibration */
+//  /* register is written to. */
+//  high = 128;
+//  low  = 0;
+//
+//  /* Do binary search for offset calibration*/
+//  while (low < high)
+//  {
+//    /* Calculate midpoint */
+//    mid = low + (high - low) / 2;
+//
+//    /* Midpoint is converted to 2's complement and written to both scan and */
+//    /* single calibration registers */
+//    cal      = adc->CAL & ~(_ADC_CAL_SINGLEOFFSET_MASK | _ADC_CAL_SCANOFFSET_MASK);
+//    cal     |= (mid - 63) << _ADC_CAL_SINGLEOFFSET_SHIFT;
+//    cal     |= (mid - 63) << _ADC_CAL_SCANOFFSET_SHIFT;
+//    adc->CAL = cal;
+//
+//    /* Do a conversion */
+//    ADC_Start(adc, adcStartSingle);
+//
+//    /* Wait while conversion is active */
+//    while (adc->STATUS & ADC_STATUS_SINGLEACT) ;
+//
+//    /* Get ADC result */
+//    sample = ADC_DataSingleGet(adc);
+//
+//    /* Check result and decide in which part of to repeat search */
+//    /* Calibration register has negative effect on result */
+//    if (sample < 0)
+//    {
+//      /* Repeat search in bottom half. */
+//      high = mid;
+//    }
+//    else if (sample > 0)
+//    {
+//      /* Repeat search in top half. */
+//      low = mid + 1;
+//    }
+//    else
+//    {
+//      /* Found it, exit while loop */
+//      break;
+//    }
+//  }
+//
+//  /* Now do gain calibration, only input and diff settings needs to be changed */
+//  adc->SINGLECTRL &= ~(_ADC_SINGLECTRL_INPUTSEL_MASK | _ADC_SINGLECTRL_DIFF_MASK);
+//  adc->SINGLECTRL |= (adcSingleInpCh4 << _ADC_SINGLECTRL_INPUTSEL_SHIFT);
+//  adc->SINGLECTRL |= (false << _ADC_SINGLECTRL_DIFF_SHIFT);
+//
+//  /* ADC is now set up for gain calibration */
+//  /* Gain calibration register is a 7 bit unsigned value. */
+//
+//  high = 128;
+//  low  = 0;
+//
+//  /* Do binary search for gain calibration */
+//  while (low < high)
+//  {
+//    /* Calculate midpoint and write to calibration register */
+//    mid = low + (high - low) / 2;
+//
+//    /* Midpoint is converted to 2's complement */
+//    cal      = adc->CAL & ~(_ADC_CAL_SINGLEGAIN_MASK | _ADC_CAL_SCANGAIN_MASK);
+//    cal     |= mid << _ADC_CAL_SINGLEGAIN_SHIFT;
+//    cal     |= mid << _ADC_CAL_SCANGAIN_SHIFT;
+//    adc->CAL = cal;
+//
+//    /* Do a conversion */
+//    ADC_Start(adc, adcStartSingle);
+//
+//    /* Wait while conversion is active */
+//    while (adc->STATUS & ADC_STATUS_SINGLEACT) ;
+//
+//    /* Get ADC result */
+//    sample = ADC_DataSingleGet(adc);
+//
+//    /* Check result and decide in which part to repeat search */
+//    /* Compare with a value atleast one LSB's less than top to avoid overshooting */
+//    /* Since oversampling is used, the result is 16 bits, but a couple of lsb's */
+//    /* applies to the 12 bit result value, if 0xffe is the top value in 12 bit, this */
+//    /* is in turn 0xffe0 in the 16 bit result. */
+//    /* Calibration register has positive effect on result */
+//    if (sample > 0xffe0)
+//    {
+//      /* Repeat search in bottom half. */
+//      high = mid;
+//    }
+//    else if (sample < 0xffe0)
+//    {
+//      /* Repeat search in top half. */
+//      low = mid + 1;
+//    }
+//    else
+//    {
+//      /* Found it, exit while loop */
+//      break;
+//    }
+//  }
+//
+//  return adc->CAL;
+//}
+

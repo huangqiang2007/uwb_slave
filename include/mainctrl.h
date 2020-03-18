@@ -51,7 +51,8 @@ enum {
 	ENUM_SLAVE_SLEEP_TOKEN,
 	ENUM_SLAVE_SYNC,
 	ENUM_SLAVE_SYNC_TOKEN,
-	ENUM_SLAVE_BAT
+	ENUM_REPEAT_DATA,
+	ENUM_REPEAT_DATA_TOKEN
 };
 
 typedef struct {
@@ -63,6 +64,8 @@ typedef struct {
 
 #define FRAME_DATA_LEN 64
 #define FRAME_LEN 76
+//#define FRAME_DATA_LEN 100
+//#define FRAME_LEN 112
 
 struct MainCtrlFrame {
 	uint8_t head0; //0xeb
@@ -117,7 +120,7 @@ uint8_t frm_cnt;
 bool g_received_cmd;
 
 bool g_dataRecvDone;
-bool g_dataRecvFail;
+uint32_t g_dataRecv_time;
 
 bool g_AD_start;
 

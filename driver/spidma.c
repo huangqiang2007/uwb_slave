@@ -45,7 +45,7 @@ void refreshRxTransfer(uint32_t channelNum,
                      bool isPrimaryDescriptor,
                      void *userPtr)
 {
-	g_spiTransDes.recvDone = true;
+	g_spiTransDes.recvActive = false;
 }
 
 /**************************************************************************//**
@@ -55,7 +55,7 @@ void refreshTxTransfer(uint32_t channelNum,
                      bool isPrimaryDescriptor,
                      void *userPtr)
 {
-	g_spiTransDes.sendDone = true;
+	g_spiTransDes.sendActive = false;
 }
 
 /**************************************************************************//**
@@ -169,12 +169,18 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 	memcpy(spiTransDes->txBuf, txbuf, txlen);
 	spiTransDes->rxBuf = rxbuf;
 
+    /* Clear RX regsiters */
+    USART1->CMD = USART_CMD_CLEARRX;
+
 	DMA_ActivateBasic(channelNumRX,
 						true,
 						false,
 						(void *) spiTransDes->rxBuf,         // Destination address to transfer to
 						(void *) &USART1->RXDATA,  // Source address to transfer from
 						txlen + rxlen - 1);       // Number of DMA transfers minus 1
+
+	/* Clear TX regsiters */
+	USART1->CMD = USART_CMD_CLEARTX;
 
 	DMA_ActivateBasic(channelNumTX,
 						true,
@@ -189,6 +195,7 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 		if (spiTransDes->uwbIRQOccur)
 			break;
 	}
+
 }
 
 void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
@@ -197,6 +204,9 @@ void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 
 	memset(spiTransDes, 0x00, sizeof(*spiTransDes));
 	memcpy(spiTransDes->txBuf, txbuf, txlen);
+
+	/* Clear TX regsiters */
+	USART1->CMD = USART_CMD_CLEARTX;
 
 	DMA_ActivateBasic(channelNumTX,
 					true,
@@ -227,4 +237,15 @@ void SPIDMAInit()
 	// Setup LDMA channels for transfer across SPI
 	initReceiveDma();
 	initTransferDma();
+}
+
+/**************************************************************************//**
+ * @brief  Returns if an SPI transfer is active
+ *****************************************************************************/
+bool spiDmaIsActive(void)
+{
+  bool temp;
+  temp = g_spiTransDes.recvActive;
+  temp = temp | g_spiTransDes.sendActive;
+  return temp;
 }

@@ -17,11 +17,13 @@
 #include "Typedefs.h"
 #include "libdw1000.h"
 #include "em_timer.h"
+#include "adc_ping_pong.h"
+
 void clockConfig(void)
 {
 	CMU_ClockEnable(cmuClock_GPIO, true);
-	CMU_ClockEnable(cmuClock_TIMER1, true);
-	setupTimer1();
+
+	timer_init();
 	Delay_ms(5);
 	GPIO_PinModeSet(gpioPortA, 1, gpioModePushPull, 1);
 	Delay_ms(5);
@@ -55,13 +57,12 @@ void clockConfig(void)
 
 void adc_test(void)
 {
-	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+//	int ADC_calibration_value = 0;
 	powerADandUWB(1);
-	powerADandUWB(0);
-	powerADandUWB(1);;
-	initADC();
+//	ADC_calibration_value = ADC_Calibration(ADC0, adcRef2V5);
+	prsTimerAdc();
 	while(1){
-		pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
+		;
 	}
 }
 
@@ -77,31 +78,13 @@ int main(void)
 	clockConfig();
 
 	SET_NUM = 5;
-	DEV_NUM = 4;
+	DEV_NUM = 3;
 	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
-	if (DEV_NUM == 1 ) {
+	if (DEV_NUM == 1 || DEV_NUM == 2) {
 		UWB_Default.AD_Samples = 50;
-		delay_sync_us = 8000;
-		delay_sync_ms = 1;
-		frm_cnt_init = 0;
 	}
-	else if (DEV_NUM == 2){
-		UWB_Default.AD_Samples = 50;
-		delay_sync_us = 6000;
-		delay_sync_ms = 3;
-		frm_cnt_init = 0;
-	}
-	else if (DEV_NUM == 3) {
+	else if (DEV_NUM == 3 || DEV_NUM == 4) {
 		UWB_Default.AD_Samples = 5000;
-		delay_sync_us = 4000;
-		delay_sync_ms = 5;
-		frm_cnt_init = 0;
-	}
-	else if (DEV_NUM == 4) {
-		UWB_Default.AD_Samples = 5000;
-		delay_sync_us = 2000;
-		delay_sync_ms = 7;
-		frm_cnt_init = 0;
 	}
 
 	/*
@@ -113,19 +96,15 @@ int main(void)
 	 * */
 	timer_init();
 	Delay_ms(5);
-	prsTimerAdc();
-	while(1){
-		;
-	}
 
 	/*
 	 * SPI master config
 	 * */
+	/*
+	 * DMA config
+	 * */
 	SPIDMAInit();
-
-	//adc_test();
-
-	//initADC();
+//	setupDma();
 
 	/*
 	 * init RTC for LFRCO 32.768KHz
@@ -163,7 +142,8 @@ int main(void)
 
 	dwNewReceive(&g_dwDev);
 	dwStartReceive(&g_dwDev);
-
+//	adc_test();
+//	while(1);
 	while (1) {
 		switch (g_cur_mode)
 		{
@@ -192,9 +172,9 @@ int main(void)
 				 * during 'g_idle_cmd_timeout' time window. The system will enter into
 				 * EM2 mode.
 				 * */
-				if (g_received_cmd && g_Ticks > g_adc_idle_cmd_timeout){
-					ADC0_Reset();
-				}
+//				if (g_received_cmd && g_Ticks > g_adc_idle_cmd_timeout){
+//					ADC0_Reset();
+//				}
 
 				break;
 

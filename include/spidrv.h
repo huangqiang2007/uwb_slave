@@ -9,10 +9,11 @@
 typedef struct {
 	int txlen;
 	int rxlen;
-	uint8_t txBuf[UWB_MAX_SPI_LEN];
+	uint8_t txBuf[UWB_MAX_SPI_LEN+3];
 	uint8_t *rxBuf;
-	volatile bool recvDone;
-	volatile bool sendDone;
+//	uint8_t rxBuf[UWB_MAX_SPI_LEN+3];
+	volatile bool recvActive;
+	volatile bool sendActive;
 	volatile bool uwbIRQOccur;
 } SPITransDes_t;
 
@@ -33,5 +34,6 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen);
 void SPIDMAInit(void);
 void initUSART1 (int SpiClk);
+bool spiDmaIsActive(void);
 
 #endif
