@@ -74,11 +74,12 @@ int main(void)
 
 	/*
 	 * config needed clock
+	 *
 	 * */
 	clockConfig();
 
 	SET_NUM = 5;
-	DEV_NUM = 3;
+	DEV_NUM = 4;
 	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
 	if (DEV_NUM == 1 || DEV_NUM == 2) {
 		UWB_Default.AD_Samples = 50;
@@ -104,7 +105,7 @@ int main(void)
 	 * DMA config
 	 * */
 	SPIDMAInit();
-//	setupDma();
+	//setupDma();
 
 	/*
 	 * init RTC for LFRCO 32.768KHz
@@ -143,7 +144,6 @@ int main(void)
 	dwNewReceive(&g_dwDev);
 	dwStartReceive(&g_dwDev);
 //	adc_test();
-//	while(1);
 	while (1) {
 		switch (g_cur_mode)
 		{

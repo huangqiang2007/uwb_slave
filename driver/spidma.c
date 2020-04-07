@@ -80,7 +80,7 @@ void initTransferDma(void)
 
 	// Channel configuration for TX transmission
 	DMA_CfgChannel_TypeDef channelConfigTX;
-	channelConfigTX.highPri   = true;                // Set high priority for the channel
+	channelConfigTX.highPri   = false;                // Set high priority for the channel
 	channelConfigTX.enableInt = false;                // Interrupt used to reset the transfer
 	channelConfigTX.select    = DMAREQ_USART1_TXBL;   // Select DMA trigger
 	channelConfigTX.cb        = &callbackTX;  	    // Callback to refresh the DMA transfer
@@ -111,7 +111,7 @@ void initReceiveDma(void)
 
 	// Channel configuration for RX transmission
 	DMA_CfgChannel_TypeDef channelConfigRX;
-	channelConfigRX.highPri   = true;                    // Set high priority for the channel
+	channelConfigRX.highPri   = false;                    // Set high priority for the channel
 	channelConfigRX.enableInt = false;                    // Interrupt used to reset the transfer
 	channelConfigRX.select    = DMAREQ_USART1_RXDATAV;    // Select DMA trigger
 	channelConfigRX.cb        = &callbackRX;  	        // Callback to refresh the DMA transfer
@@ -171,7 +171,7 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 
     /* Clear RX regsiters */
     USART1->CMD = USART_CMD_CLEARRX;
-
+//    spiTransDes->recvActive = true;
 	DMA_ActivateBasic(channelNumRX,
 						true,
 						false,
@@ -181,7 +181,7 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 
 	/* Clear TX regsiters */
 	USART1->CMD = USART_CMD_CLEARTX;
-
+//	spiTransDes->sendActive = true;
 	DMA_ActivateBasic(channelNumTX,
 						true,
 						false,
@@ -189,12 +189,14 @@ void spiTransferForRead(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen,
 						(void *) spiTransDes->txBuf,         // Source address to transfer from
 						txlen + rxlen - 1);       // Number of DMA transfers minus 1
 
+//	while (spiTransDes->sendActive || spiTransDes->recvActive) ;
 	status = USART1->STATUS;
-	while (!(status & status_txc)) {
+	while (!(status & status_txc) ) {
 		status = USART1->STATUS;
 		if (spiTransDes->uwbIRQOccur)
 			break;
 	}
+
 
 }
 
@@ -207,7 +209,7 @@ void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 
 	/* Clear TX regsiters */
 	USART1->CMD = USART_CMD_CLEARTX;
-
+//	spiTransDes->sendActive = true;
 	DMA_ActivateBasic(channelNumTX,
 					true,
 					false,
@@ -215,12 +217,14 @@ void spiTransferForWrite(SPITransDes_t *spiTransDes, uint8_t *txbuf, int txlen)
 					(void *) spiTransDes->txBuf,         // Source address to transfer from
 					txlen - 1);       // Number of DMA transfers minus 1
 
+//	while (spiTransDes->sendActive) ;
 	status = USART1->STATUS;
 	while (!(status & status_txc)) {
 		status = USART1->STATUS;
 		if (spiTransDes->uwbIRQOccur)
 			break;
 	}
+
 }
 
 void SPIDMAInit()

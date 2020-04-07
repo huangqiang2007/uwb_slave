@@ -12,12 +12,20 @@
 #include "em_core.h"
 #include "adcdrv.h"
 #include "libdw1000.h"
-
+#include "em_timer.h"
 /*
  * slave device ID 0x0 - 0x3 *
  * */
 int8_t SLAVE_ID = 0x0;
 bool free_frm_status = false;
+uint32_t TE_reg = 0;
+uint32_t sync_cnt = 0;
+
+uint32_t TE_std = 0;
+uint32_t TE_mean = 0;
+uint16_t cnt = 0;
+int32_t TE_dif_std=0;
+uint32_t TE_reg_temp=0;
 
 devInfo_t g_devInfo = {
 		.devId = SLAVE_ADDR1,
@@ -44,6 +52,7 @@ void globalInit(void)
 	s_index_chg = false;
 	free_frm_status = false;
 	g_dataRecv_time = 0;
+	g_dataSend_time = 0;
 }
 
 void sleepAndRestore(void)
@@ -110,6 +119,57 @@ void sleepAndRestore(void)
 	g_Ticks = 0;
 	g_idle_wkup_timeout = g_Ticks + IDLE_WKUP_TIMEOUT;
 	//g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
+}
+
+void time_sync(uint32_t TE_reg){
+	uint32_t TE_dif;
+	uint32_t t0, t1;
+
+	if (TE_reg > TE_std){
+		TE_dif = TE_reg - TE_std;
+		t0 = TIMER_CounterGet(TIMER0);
+		t1 = TIMER_CounterGet(TIMER1);
+
+		if (t0 > TE_dif){
+			TIMER_CounterSet(TIMER0,t0-TE_dif);
+			if (t1 >= TE_dif){
+				TIMER_CounterSet(TIMER1,t1-TE_dif);
+			}
+			else{
+				TIMER_CounterSet(TIMER1,MS_COUNT - TE_dif + t1);
+				g_Ticks--;
+			}
+		}
+	}
+	else{
+		TE_dif = TE_std - TE_reg;
+		t0 = TIMER_CounterGet(TIMER0) + TE_dif;
+		t1 = TIMER_CounterGet(TIMER1) + TE_dif;
+
+		if (t0 < US200_COUNT - 1){
+			TIMER_CounterSet(TIMER0, t0);
+
+			if (t1 <= MS_COUNT - 1){
+				TIMER_CounterSet(TIMER1,t1);
+			}
+			else{
+				TIMER_CounterSet(TIMER1,t1-MS_COUNT);
+				g_Ticks++;
+			}
+		}
+	}
+}
+
+uint32_t time_get(uint8_t TOA_Low, uint8_t TOA_High){
+	uint32_t TOA_R;
+	uint32_t TOA_T;
+	uint32_t TE;
+
+	TOA_R = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1) - g_dataSend_time;
+	TOA_T = TOA_Low + (TOA_High<<8);
+	TE = (TOA_T - TOA_R)>>1;
+//	TE = TIMER_CounterGet(TIMER1);
+	return TE;
 }
 
 /*
@@ -224,17 +284,26 @@ void form_sample_set_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, stru
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 	frm_cnt = frm_cnt_init;
 
-	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8000);
+	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8750);
 }
 
 void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint16_t data_crc;
+	uint32_t TE;
+	uint32_t TE_dif;
+	int32_t TE_dif_std_temp;
+	uint32_t t0, t1;
+	//TE = time_get(pMainCtrlFrame->frameCtrl_blank[0], pMainCtrlFrame->frameCtrl_blank[1]);
+//	uint32_t TOA_R = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1) - g_dataSend_time;
+//	uint32_t TOA_T = pMainCtrlFrame->frameCtrl_blank[0]+ (pMainCtrlFrame->frameCtrl_blank[1]<<8);
+//	TE = (TOA_T - TOA_R)>>1;
+	TE = TIMER_CounterGet(TIMER1);
+	cnt++;
 
 	pMainCtrlFrame->frameType = ENUM_SAMPLE_DATA_TOKEN;
 	//adc_index = pMainCtrlFrame->adcIndex;
-
 	pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
 
 	if (!pSampleBuf) {
@@ -247,20 +316,82 @@ void form_sample_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 		pMainCtrlFrame->len = FRAME_LEN;
 		frm_cnt++;
 		free_frm_status = false;
-		/*
-		 * update sampled battery voltage
-		 * */
-		//delay_us = 8500;
 	}
 	pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
-	pMainCtrlFrame->adcIndex = slave_adc_index;
+	//pMainCtrlFrame->adcIndex = slave_adc_index;
+	TE_mean = TE_mean + TE;
+	if (cnt == 128){
+		cnt = 0;
+		sync_cnt++;
+		TE_reg = TE_mean >> 7;
+		TE_mean = 0;
+		if (sync_cnt<2)
+			TE_std = TE_reg;
+		else{
+			if (sync_cnt==2){
+				TE_std = pMainCtrlFrame->frameCtrl_blank[2] + (pMainCtrlFrame->adcIndex<<8);
+			}
+			else{
+				TE_dif_std_temp = TE_reg - TE_std - TE_dif_std;
+				if (TE_dif_std_temp > 8 || TE_dif_std_temp < -8)
+					TE_reg = TE_reg_temp;
+			}
+			//time_sync(TE_reg);
+			TIMER_Enable(TIMER0, false);
+			TIMER_Enable(TIMER1, false);
+			if (TE_reg > TE_std){
+				TE_dif = TE_reg - TE_std;
+				t0 = TIMER_CounterGet(TIMER0);
+				t1 = TIMER_CounterGet(TIMER1);
+
+				if (t0 > TE_dif){
+					TIMER_CounterSet(TIMER0,t0-TE_dif);
+					if (t1 >= TE_dif){
+						TIMER_CounterSet(TIMER1,t1-TE_dif);
+					}
+					else{
+						TIMER_CounterSet(TIMER1,MS_COUNT - TE_dif + t1);
+						g_Ticks--;
+					}
+				}
+			}
+			else{
+				TE_dif = TE_std - TE_reg;
+				t0 = TIMER_CounterGet(TIMER0) + TE_dif;
+				t1 = TIMER_CounterGet(TIMER1) + TE_dif;
+
+				if (t0 < US200_COUNT - 1){
+					TIMER_CounterSet(TIMER0, t0);
+					if (t1 <= MS_COUNT - 1){
+						TIMER_CounterSet(TIMER1,t1);
+					}
+					else{
+						TIMER_CounterSet(TIMER1,t1-MS_COUNT);
+						g_Ticks++;
+					}
+				}
+			}
+			TIMER_Enable(TIMER0, true);
+			TIMER_Enable(TIMER1, true);
+		}
+		TE_dif_std = TE_reg - TE_std;
+		TE_reg_temp = TE_reg;
+	}
+
+	pMainCtrlFrame->frameCtrl_blank[0] = TE_reg;
+	pMainCtrlFrame->frameCtrl_blank[1] = TE_reg>>8;
+	pMainCtrlFrame->frameCtrl_blank[2] = TE_std;
+//	pMainCtrlFrame->frameCtrl_blank[2] = TOA_T;
+	pMainCtrlFrame->adcIndex = TE_std>>8;
 	pMainCtrlFrame->serial = frm_cnt;
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8750);
+	g_dataSend_time = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1);
 	g_dataRecv_time = g_Ticks;
+
 }
 
 void form_repeat_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -268,8 +399,19 @@ void form_repeat_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint16_t data_crc;
 	uint32_t times;
+	uint32_t TE;
+	uint32_t TE_dif;
+	int32_t TE_dif_std_temp;
+	uint32_t t0, t1;
 
 	times = g_Ticks - g_dataRecv_time;
+//	uint32_t TOA_R = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1) - g_dataSend_time;
+//	uint32_t TOA_T = pMainCtrlFrame->frameCtrl_blank[0]+ (pMainCtrlFrame->frameCtrl_blank[1]<<8);
+//	TE = (TOA_T - TOA_R)>>1;
+	TE = TIMER_CounterGet(TIMER1);
+	cnt++;
+//	TE = time_get(pMainCtrlFrame->frameCtrl_blank[0], pMainCtrlFrame->frameCtrl_blank[1]);
+
 	pMainCtrlFrame->frameType = ENUM_REPEAT_DATA_TOKEN;
 	//adc_index = pMainCtrlFrame->adcIndex;
 	if (times <= 18 && (!free_frm_status)){
@@ -293,20 +435,78 @@ void form_repeat_data_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, str
 		if (times > 18 || free_frm_status){
 			frm_cnt++;
 		}
-
-		/*
-		 * update sampled battery voltage
-		 * */
-		//delay_us = 8500;
 	}
 	pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
-	pMainCtrlFrame->adcIndex = slave_adc_index;
+	TE_mean = TE_mean + TE;
+	if (cnt == 128){
+		cnt = 0;
+		sync_cnt++;
+		TE_reg = TE_mean >> 7;
+		TE_mean = 0;
+		if (sync_cnt<2)
+			TE_std = TE_reg;
+		else{
+			if (sync_cnt==2){
+				TE_std = pMainCtrlFrame->frameCtrl_blank[2] + (pMainCtrlFrame->adcIndex<<8);
+			}
+			else{
+				TE_dif_std_temp = TE_reg - TE_std - TE_dif_std;
+				if (TE_dif_std_temp > 8 || TE_dif_std_temp < -8)
+					TE_reg = TE_reg_temp;
+			}
+			//time_sync(TE_reg);
+			TIMER_Enable(TIMER0, false);
+			TIMER_Enable(TIMER1, false);
+			if (TE_reg > TE_std){
+				TE_dif = TE_reg - TE_std;
+				t0 = TIMER_CounterGet(TIMER0);
+				t1 = TIMER_CounterGet(TIMER1);
+
+				if (t0 > TE_dif){
+					TIMER_CounterSet(TIMER0,t0-TE_dif);
+					if (t1 >= TE_dif){
+						TIMER_CounterSet(TIMER1,t1-TE_dif);
+					}
+					else{
+						TIMER_CounterSet(TIMER1,MS_COUNT - TE_dif + t1);
+						g_Ticks--;
+					}
+				}
+			}
+			else{
+				TE_dif = TE_std - TE_reg;
+				t0 = TIMER_CounterGet(TIMER0) + TE_dif;
+				t1 = TIMER_CounterGet(TIMER1) + TE_dif;
+
+				if (t0 < US200_COUNT - 1){
+					TIMER_CounterSet(TIMER0, t0);
+					if (t1 <= MS_COUNT - 1){
+						TIMER_CounterSet(TIMER1,t1);
+					}
+					else{
+						TIMER_CounterSet(TIMER1,t1-MS_COUNT);
+						g_Ticks++;
+					}
+				}
+			}
+			TIMER_Enable(TIMER0, true);
+			TIMER_Enable(TIMER1, true);
+		}
+		TE_dif_std = TE_reg - TE_std;
+		TE_reg_temp = TE_reg;
+	}
+	//pMainCtrlFrame->adcIndex = slave_adc_index;
+	pMainCtrlFrame->frameCtrl_blank[0] = TE_reg;
+	pMainCtrlFrame->frameCtrl_blank[1] = TE_reg>>8;
+	pMainCtrlFrame->frameCtrl_blank[2] = TE_std;
+	pMainCtrlFrame->adcIndex = TE_std>>8;
 	pMainCtrlFrame->serial = frm_cnt;
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
 
 	sendTokenFrame(dev, dwMacFrame, pMainCtrlFrame, 8750);
+	g_dataSend_time = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1);
 }
 
 void form_slave_status_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
@@ -345,13 +545,19 @@ void form_sleep_token_frame(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct Ma
 void Sync_Slave_Bat_Get(dwDevice_t *dev, dwMacFrame_t *dwMacFrame, struct MainCtrlFrame *pMainCtrlFrame)
 {
 	//int ADC_calibration_value = 0;
-	CORE_CriticalDisableIrq();
-		pollADCForBattery();
+	//CORE_CriticalDisableIrq();
+	TIMER_Enable(TIMER1, false);
+	TIMER_CounterSet(TIMER1, 0);
+	g_Ticks = 0;
+	TIMER_Enable(TIMER1, true);
+
+	pollADCForBattery();
 		//ADC_calibration_value = ADC_Calibration(ADC0, adcRef2V5);
-		prsTimerAdc();
-	CORE_CriticalEnableIrq();
+	prsTimerAdc();
+	//CORE_CriticalEnableIrq();
 	dwNewReceive(dev);
 	dwStartReceive(dev);
+	sync_cnt=0;
 }
 
 //int p_cnt=0;

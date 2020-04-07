@@ -118,9 +118,10 @@ uint8_t frm_cnt;
  * false: received no cmd
  * */
 bool g_received_cmd;
-
+bool g_received_wait;
 bool g_dataRecvDone;
 uint32_t g_dataRecv_time;
+uint32_t g_dataSend_time;
 
 bool g_AD_start;
 

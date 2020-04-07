@@ -22,6 +22,7 @@
 #include <math.h>
 #include "em_cmu.h"
 #include "em_gpio.h"
+#include "em_timer.h"
 #include "spidrv.h"
 #include "timer.h"
 #include "mainctrl.h"
@@ -94,7 +95,7 @@ void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 	writeValueToBytes(dev->antennaDelay.raw, 16384, LEN_STAMP);
 
 	// Dummy callback handlers
-	dev->handleSent = dummy;
+	dev->handleSent = dwSentData;
 	dev->handleReceiveFailed = dwReceiveFailed;
 
 	/*
@@ -668,7 +669,7 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 		//auto switch to receive state after a bad receive
 		//if double buffer is enable, switch to receive state after a good receive
 		//if double buffer and auto acknowledgment are enable, auto transmit acknowledgment and switch to receive state
-		dwWaitForResponse(dev,true);
+
 		//set auto send acknowledgment after receive a frame with a acknowledgment request
 		dwSetAutoAck(dev,false);
 		//set CRC frame check
@@ -694,7 +695,7 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 //		dwSetFrameFilterBehaveCoordinator(dev, true);
 
 		//interrupt active for complete transmit
-		dwInterruptOnSent(dev, false);
+		dwInterruptOnSent(dev, true);
 		//interrupt active for complete receive
 		dwInterruptOnReceived(dev, true);
 		//interrupt active for receiver timeout when dwSetReceiveWaitTimeout() is enable true
@@ -730,6 +731,7 @@ void dwSetSubNodeConfig(dwDevice_t* dev) {
 		//if double buffer is enable, switch to receive state after a good receive
 		//if double buffer and auto acknowledgment are enable, auto transmit acknowledgment and switch to receive state
 		dwSetReceiverAutoReenable(dev,false);
+		dwWaitForResponse(dev,false);
 		//set auto send acknowledgment after receive a frame with a acknowledgment request
 		dwSetAutoAck(dev,false);
 		//set CRC frame check
@@ -1403,7 +1405,7 @@ void dwHandleInterrupt(dwDevice_t *dev)
 		dwClearTransmitStatus(dev);
 		(*dev->handleSent)(dev);
 	}
-//	if(dwIsReceiveTimestampAvailable(dev) && _handleReceiveTimestampAvailable != 0) {
+//	if(dwIsReceiveTimestampAvailable(dev) && _seceiveTimestampAvailable != 0) {
 //		dwClearReceiveTimestampAvailableStatus(dev);
 //		(*_handleReceiveTimestampAvailable)();
 //	}
@@ -1725,7 +1727,8 @@ void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_tim
 	dwSetData(dev, data, len);
 	dwWaitForResponse(dev,true); //set auto turn on receiver after a transmit
 	dwStartTransmit(dev);
-	dwSetAckAndRespTime(dev, 3, resp_time_us); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
+	dwSetAckAndRespTime(dev, 0, resp_time_us); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
+
 //	dwIdle(dev);
 //	dwNewReceive(dev);
 //	dwStartReceive(dev);
@@ -1738,20 +1741,21 @@ void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_tim
 
 void dwRecvData(dwDevice_t *dev)
 {
-	int len = sizeof(g_recvSlaveFr);
-
+	//int len = sizeof(g_recvSlaveFr);
+	int len = 11;
 	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
-
 //	len = dwGetDataLength(dev);
 
 //	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
 //	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
 //	g_dataRecvDone = true;
+
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
 	if ((((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) || ((g_recvSlaveFr.frameCtrl & 0xff) == 0x00)) && (((g_recvSlaveFr.frameType & 0x0f) % 2)== 1)){
 
 		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
+
 		//g_dataRecvDone = true;
 //		if(g_recvSlaveFr.frameType == 0x03){
 //			g_cnt += 1;
@@ -1762,42 +1766,15 @@ void dwRecvData(dwDevice_t *dev)
 		dwStartReceive(dev);
 		//g_dataRecvDone = false;
 	}
-//	dwNewReceive(dev);
-//	dwStartReceive(dev);
 }
 
 void dwSentData(dwDevice_t *dev)
 {
-	;
+//	g_dataSend_time = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1);
 }
 
 void dwReceiveFailed(dwDevice_t *dev)
 {
-//	int len = 0;
-//
-//	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
-//	len = dwGetDataLength(dev);
-//
-////	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
-////	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
-//
-////	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
-//
-//	if (((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) && ((g_recvSlaveFr.frameType % 2)== 1)){
-//
-//		g_recvSlaveFr.serial = g_recvSlaveFr.serial + 1;
-//		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
-//		g_dataRecvDone = true;
-////		if(g_recvSlaveFr.frameType == 0x03){
-////			g_cnt += 1;
-////		}
-//	}
-//	else{
-//		dwNewReceive(dev);
-//		dwStartReceive(dev);
-//		g_dataRecvDone = false;
-//	}
-//	g_dataRecvFail_cnt++;
 	dwNewReceive(dev);
 	dwStartReceive(dev);
 

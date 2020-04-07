@@ -19,9 +19,9 @@ uint8_t DEV_NUM;
 /*
  * SPI Rx & Tx DMA channel
  * */
+#define SPI_TX_DMA_CH	0
 #define SPI_RX_DMA_CH	1
-#define SPI_TX_DMA_CH	2
-#define DMA_CHANNEL_ADC 0
+#define DMA_CHANNEL_ADC 2
 
 
 #define PORT_UART       gpioPortE

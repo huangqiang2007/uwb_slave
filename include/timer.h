@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define MS_COUNT  	 	3125  //25000000 / 8 / 1000
+#define US200_COUNT  	625   //25000000 / 8 / 5000
+#define US20000_COUNT  	62500   //25000000 / 8 / 50
+#define MAX_MS       	20    //65535 / MS_COUNT for sleep time
+
+
 volatile uint32_t g_Ticks;
 
 /*
@@ -13,6 +19,7 @@ volatile uint32_t g_Ticks;
  *
  * 300 * 1ms = 300ms
  * */
+
 #define IDLE_WKUP_TIMEOUT 300
 volatile uint32_t g_idle_wkup_timeout;
 

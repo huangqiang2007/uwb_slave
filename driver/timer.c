@@ -10,10 +10,7 @@
 #include "em_gpio.h"
 
 // Freq = 25M
-#define TOP 25000
-#define MS_COUNT  	 3125  //25000000 / 8 / 1000
-#define US200_COUNT  625   //25000000 / 8 / 5000
-#define MAX_MS       20    //65535 / MS_COUNT for sleep time
+#define TOP 			25000
 
 volatile bool Timer1_overflow;
 /**************************************************************************//**
@@ -73,7 +70,10 @@ void setupTimer0(void)
 //	NVIC_EnableIRQ(TIMER0_IRQn);
 
 	/* Set TIMER Top value */
-	TIMER_TopSet(TIMER0, US200_COUNT); //200 us
+	if (UWB_Default.AD_Samples == 5000)
+		TIMER_TopSet(TIMER0, US200_COUNT); //200 us
+	else if (UWB_Default.AD_Samples == 50)
+		TIMER_TopSet(TIMER0, US20000_COUNT); //20 ms
 
 	/* Configure TIMER */
 	TIMER_Init(TIMER0, &timerInit);

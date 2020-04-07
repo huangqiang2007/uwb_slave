@@ -15,6 +15,7 @@
 #include "main.h"
 #include "adc_ping_pong.h"
 #include "math.h"
+#include "spidrv.h"
 
 #define ADC_DMA_ENABLE 0
 #define ADC_INT_ENABLE 1
@@ -22,7 +23,7 @@
 /* Defines for ADC */
 #define PRS_ADC_CH      5               /* PRS channel */
 #define ADC_PRS_CH      adcPRSSELCh5
-#define ADC_START_CNT   300 	        /* First PRS TIMER trigger count */
+#define ADC_START_CNT   0 	        	/* First PRS TIMER trigger count */
 
 /*
  * ADC sample clock
@@ -180,7 +181,7 @@ void readADC(void)
 	//	temp = ADC_DataSingleGet(ADC0) & 0x00FF;
 	//	temp = temp >> 7;
 	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 4;
+	precvBuf[s_index++] = (ADC_DataSingleGet(ADC0) & 0xFFFF) >> 8;
 
 	/*
 	 * poll battery voltage every 1 second
@@ -234,6 +235,17 @@ void prsTimerAdc(void)
 //  timerInit.prescale = timerPrescale8;        /* Overflow after aprox 1s */
 //  TIMER_Init(TIMER0, &timerInit);
 
+  /* Enabling PingPong Transfer*/
+//  DMA_ActivatePingPong(DMA_CHANNEL_ADC,
+//						  false,
+//						  (void *)ramBufferAdcData1,
+//						  (void *)&(ADC0->SINGLEDATA),
+//						  ADCSAMPLES - 1,
+//						  (void *)ramBufferAdcData2,
+//						  (void *)&(ADC0->SINGLEDATA),
+//						  ADCSAMPLES - 1);
+
+//  g_spiTransDes.sendActive = false;
   ADC0_Reset();
   TIMER_Enable(TIMER0, false);
 
@@ -243,25 +255,28 @@ void prsTimerAdc(void)
   /* Init common settings for both single conversion and scan mode */
   init.timebase = ADC_TimebaseCalc(0);
 	// Modify init structs and initialize
-//	if (UWB_Default.AD_Samples == 50){
+	if (UWB_Default.AD_Samples == 50){
 //		ADC_CLK = 867600;
-//		initSingle.acqTime = adcAcqTime256;
-////		init.ovsRateSel = adcOvsRateSel64;
-//	}
-//	else if (UWB_Default.AD_Samples == 5000){
-		ADC_CLK = 1000000;
-		initSingle.acqTime = adcAcqTime16;
-//		init.ovsRateSel = adcOvsRateSel16;
-//	}
-  init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
-  init.lpfMode = adcLPFilterDeCap;
+		initSingle.acqTime = adcAcqTime256;
+		init.ovsRateSel = adcOvsRateSel64;
+		init.prescale = 27;
+	}
+	else if (UWB_Default.AD_Samples == 5000){
+//		ADC_CLK = 1000000;
+//		init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
+		initSingle.acqTime = adcAcqTime4;
+		init.ovsRateSel = adcOvsRateSel16;
+		init.prescale = 17;
+	}
+//  init.prescale = ADC_PrescaleCalc(ADC_CLK, 0);
+//  init.lpfMode = adcLPFilterDeCap;
 
   /* Initialize ADC single sample conversion */
   initSingle.prsSel = ADC_PRS_CH;       /* Select PRS channel */
   initSingle.reference = adcRef2V5;     /* VDD or AVDD as ADC reference */
   initSingle.input = adcSingleInputCh4;   /* VDD as ADC input */
-  initSingle.resolution = adcRes12Bit;   // 8-bit resolution
-//  initSingle.resolution = adcResOVS;   // 8-bit resolution
+//  initSingle.resolution = adcRes12Bit;   // 8-bit resolution
+  initSingle.resolution = adcResOVS;   // 8-bit resolution
   initSingle.prsEnable = true;          /* PRS enable */
 
   ADC_Init(ADC0, &init);
@@ -284,36 +299,36 @@ void prsTimerAdc(void)
 //  prsDemoExit();
 }
 
-//void collectSamples(uint16_t dataBuf[])
-//{
-//	static int8_t s_index = 0;
-////	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
-////	uint8_t *precvBuf = NULL;
-////	float vol = 0.0;
+void collectSamples(uint16_t dataBuf[])
+{
+	static int8_t s_index = 0;
+//	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
+//	uint8_t *precvBuf = NULL;
+//	float vol = 0.0;
+
+//	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
+//	if (!pSampleBuf)
+//		return;
 //
-////	pSampleBuf  = getSampelInputbuf(&g_adcSampleDataQueue);
-////	if (!pSampleBuf)
-////		return;
-////
-////	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
-////	for (int i=0;i<FRAME_DATA_LEN;i++){
-////		precvBuf[i] = (dataBuf[i] & 0xFFFF) >> 4;
-////	}
-//
-//	for (int i=0;i<ADCSAMPLES;i++){
-//		g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[s_index*ADCSAMPLES+i] = (dataBuf[i] & 0xFFFF) >> 4;
-//		//g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[i] = (dataBuf[i] & 0xFFFF) >> 4;
+//	precvBuf = (uint8_t *)&pSampleBuf->adc_sample_buffer[0];
+//	for (int i=0;i<FRAME_DATA_LEN;i++){
+//		precvBuf[i] = (dataBuf[i] & 0xFFFF) >> 4;
 //	}
-//	s_index++;
-////	precvBuf = NULL;
-//	if (s_index == 8){
-//		s_index = 0;
-//		g_adcSampleDataQueue.samples++;
-//		g_adcSampleDataQueue.in++;
-//		if (g_adcSampleDataQueue.in == Q_LEN)
-//			g_adcSampleDataQueue.in = 0;
-//	}
-//}
+
+	for (int i=0;i<ADCSAMPLES;i++){
+		g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[s_index*ADCSAMPLES+i] = (dataBuf[i] & 0xFFFF) >> 8;
+//		g_adcSampleDataQueue.adc_smaple_data[g_adcSampleDataQueue.in].adc_sample_buffer[i] = (dataBuf[i] & 0xFFFF) >> 4;
+	}
+	s_index++;
+//	precvBuf = NULL;
+	if (s_index == 2){
+		s_index = 0;
+		g_adcSampleDataQueue.samples++;
+		g_adcSampleDataQueue.in++;
+		if (g_adcSampleDataQueue.in == Q_LEN)
+			g_adcSampleDataQueue.in = 0;
+	}
+}
 #endif
 
 void ADC0_Reset(void){
