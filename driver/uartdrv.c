@@ -119,9 +119,9 @@ void uartSetup(void)
 	uartInit.databits     = usartDatabits8; /* Number of data bits. Range is 4 to 10 */
 	uartInit.parity       = usartNoParity; /* Parity mode */
 	uartInit.stopbits     = usartStopbits1; /* Number of stop bits. Range is 0 to 2 */
-	uartInit.mvdis        = false;          /* Disable majority voting */
-	uartInit.prsRxEnable  = false;          /* Enable USART Rx via Peripheral Reflex System */
-	uartInit.prsRxCh      = usartPrsRxCh0;  /* Select PRS channel if enabled */
+//	uartInit.mvdis        = false;          /* Disable majority voting */
+//	uartInit.prsRxEnable  = false;          /* Enable USART Rx via Peripheral Reflex System */
+//	uartInit.prsRxCh      = usartPrsRxCh0;  /* Select PRS channel if enabled */
 
 	/*
 	 * Initialize USART with uartInit struct

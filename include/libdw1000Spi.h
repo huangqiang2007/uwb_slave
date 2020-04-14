@@ -28,7 +28,7 @@
 #include "dw1000.h"
 #include "libdw1000Types.h"
 
-#define TX_Data_Size 128
+#define TX_Data_Size 127
 #define Header_Size 3
 
 /**
@@ -39,6 +39,7 @@ uint16_t dwSpiRead16(dwDevice_t *dev, uint8_t regid, uint32_t address);
 uint32_t dwSpiRead32(dwDevice_t *dev, uint8_t regid, uint32_t address);
 
 uint8_t txbuffer[TX_Data_Size + Header_Size];
+uint8_t dataRead[TX_Data_Size + Header_Size];
 
 /**
  * Write to the dw1000 SPI interface

@@ -22,11 +22,32 @@
 #include "libdw1000Spi.h"
 #include "spidrv.h"
 
+//void dwSpiRead_01(dwDevice_t *dev, uint8_t regid, uint32_t address,
+//                                void* data, int length) {
+//  uint8_t header[10] = {0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+//  uint32_t status = 0;
+//  uint8_t *pdata = data;
+//
+//  status = usart_spi->STATUS;
+//  //USART_Enable(usart_spi, usartEnable);
+//  usart_spi->CMD |= (usartEnable);
+//  usart_spi->CMD |= 0xc00;
+//  usart_spi->CTRL |= USART_CTRL_AUTOTX;
+//  SPISendNbytes(header, 1);
+//  SPIRecvNBytes(data, length);
+////  for (int i = 0; i < 10; i++)
+////  	  pdata[i] = USARTSpiTransfer(usart_spi, header[i]);
+//  //USART_Enable(usart_spi, usartDisable);
+//  usart_spi->CTRL &= ~USART_CTRL_AUTOTX;
+//  usart_spi->CMD |= (USART_CMD_RXDIS | USART_CMD_TXDIS);
+//  status = usart_spi->STATUS;
+//}
 
 void dwSpiRead(dwDevice_t *dev, uint8_t regid, uint32_t address,
                                 void* data, int length) {
   uint8_t header[Header_Size];
   int headerLength;
+
 
   header[0] = regid & 0x3f; //set read mode, set sub-index = 0 by default, set register file ID to header buffer 0
   headerLength = 1; //set header length = 1 by default,
@@ -44,20 +65,24 @@ void dwSpiRead(dwDevice_t *dev, uint8_t regid, uint32_t address,
       headerLength = 3; //set header length = 3
     }
   }
-
-  SPISendNbytes(header, headerLength);
-  SPIRecvNBytes(data, length);
+  USART1->CMD |= 0x00000C00; //clear buffer
+  spiTransferForRead(&g_spiTransDes, header, headerLength, dataRead, length);
+  memcpy(data, &dataRead[headerLength],length);
 }
 
-uint16_t dwSpiRead16(dwDevice_t *dev, uint8_t regid, uint32_t address) {
+uint16_t dwSpiRead16(dwDevice_t *dev, uint8_t regid, uint32_t address)
+{
   uint16_t data;
   dwSpiRead(dev, regid, address, &data, sizeof(data));
+
   return data;
 }
 
-uint32_t dwSpiRead32(dwDevice_t *dev, uint8_t regid, uint32_t address) {
+uint32_t dwSpiRead32(dwDevice_t *dev, uint8_t regid, uint32_t address)
+{
   uint32_t data;
   dwSpiRead(dev, regid, address, &data, sizeof(data));
+
   return data;
 }
 
@@ -66,7 +91,7 @@ void dwSpiWrite(dwDevice_t *dev, uint8_t regid, uint32_t address,
   //uint8_t header[Header_Size];
   int headerLength;
 
-  txbuffer[0] = regid & 0xbf; //set write mode, set sub-index = 0 by default, set register file ID to header buffer 0
+  txbuffer[0] = regid | 0x80; //set write mode, set sub-index = 0 by default, set register file ID to header buffer 0
   headerLength = 1; //set header length = 1 by default,
 
   if (address != 0) { //if sub-address != 0
@@ -80,25 +105,25 @@ void dwSpiWrite(dwDevice_t *dev, uint8_t regid, uint32_t address,
       txbuffer[1] |= 0x80; //set extend-address = 1
       txbuffer[2] = address & 0xff; //set higher order 8 bits sub-address to header buffer 2
       headerLength = 3; //set header length = 3
-
     }
   }
 
-  memcpy(&txbuffer[headerLength], data, length+headerLength);
-  SPISendNbytes(txbuffer, length+headerLength);
+  memcpy(&txbuffer[headerLength], data, length);
+  USART1->CMD |= 0x00000C00; //clear buffer
+  spiTransferForWrite(&g_spiTransDes, txbuffer, length+headerLength);
 }
 
 void dwSpiWrite8(dwDevice_t *dev, uint8_t regid, uint32_t address,
                                    uint8_t data) {
-  dwSpiWrite(dev, regid, address, &data, sizeof(data));
+	dwSpiWrite(dev, regid, address, &data, sizeof(data));
 }
 
 void dwSpiWrite16(dwDevice_t *dev, uint8_t regid, uint32_t address,
                                    uint16_t data) {
-  dwSpiWrite(dev, regid, address, &data, sizeof(data));
+	dwSpiWrite(dev, regid, address, &data, sizeof(data));
 }
 
 void dwSpiWrite32(dwDevice_t *dev, uint8_t regid, uint32_t address,
                                    uint32_t data) {
-  dwSpiWrite(dev, regid, address, &data, sizeof(data));
+	dwSpiWrite(dev, regid, address, &data, sizeof(data));
 }

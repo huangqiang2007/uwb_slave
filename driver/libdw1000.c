@@ -22,11 +22,13 @@
 #include <math.h>
 #include "em_cmu.h"
 #include "em_gpio.h"
-#include "timer.h"
+#include "em_timer.h"
 #include "spidrv.h"
+#include "timer.h"
 #include "mainctrl.h"
 #include "libdw1000.h"
-
+#include "dw1000.h"
+#include "main.h"
 
 static const uint8_t BIAS_500_16_ZERO = 10;
 static const uint8_t BIAS_500_64_ZERO = 8;
@@ -56,8 +58,14 @@ static bool getBit(uint8_t data[], unsigned int n, unsigned int bit);
 
 static void readBytesOTP(dwDevice_t* dev, uint16_t address, uint8_t data[]);
 
+//extern volatile uint32_t g_Ticks;
+//extern volatile uint32_t tx_finish_times;
+//extern volatile uint32_t tx_start_times;
+
 static void dummy(){
-  ;
+//	uint32_t tx_times;
+//	tx_finish_times = g_Ticks;
+//	tx_times = tx_start_times - tx_finish_times;
 }
 
 void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
@@ -66,19 +74,19 @@ void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 
 	/* Device default state */
 	//memcpy(dev->networkAndAddress, 0x00010001, LEN_PANADR); //PAN ID: 0001, Short Address:0001
-	dev->networkAndAddress[0] = PanID;
-	dev->networkAndAddress[1] = PanID>>8;
-	dev->networkAndAddress[2] = sourceAddr;
-	dev->networkAndAddress[3] = sourceAddr>>8;
+	dev->networkAndAddress[0] = sourceAddr;
+	dev->networkAndAddress[1] = sourceAddr>>8;
+	dev->networkAndAddress[2] = PanID;
+	dev->networkAndAddress[3] = PanID>>8;
 	dev->extendedFrameLength = FRAME_LENGTH_NORMAL;
 	dev->pacSize = PAC_SIZE_8;
-	dev->pulseFrequency = TX_PULSE_FREQ_16MHZ;
+	dev->pulseFrequency = TX_PULSE_FREQ_64MHZ;
 	dev->dataRate = TRX_RATE_6800KBPS;
 	dev->preambleLength = TX_PREAMBLE_LEN_128;
-	dev->preambleCode = PREAMBLE_CODE_16MHZ_4;
-	dev->channel = CHANNEL_5;
+	dev->preambleCode = PREAMBLE_CODE_64MHZ_9;
+	dev->channel = CHANNEL_2;
 	dev->smartPower = true;
-	dev->frameCheck = true;
+	dev->frameCheck = false;
 	dev->permanentReceive = false;
 	dev->deviceMode = IDLE_MODE;
 	dev->wait4resp = false;
@@ -87,14 +95,13 @@ void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 	writeValueToBytes(dev->antennaDelay.raw, 16384, LEN_STAMP);
 
 	// Dummy callback handlers
-	dev->handleSent = dummy;
-	dev->handleReceiveFailed = dummy;
+	dev->handleSent = dwSentData;
+	dev->handleReceiveFailed = dwReceiveFailed;
 
 	/*
 	 * data receive callback
 	 * */
 	dev->handleReceived = dwRecvData;
-
 }
 
 void dwSetUserdata(dwDevice_t* dev, void* userdata)
@@ -105,6 +112,14 @@ void dwSetUserdata(dwDevice_t* dev, void* userdata)
 void* dwGetUserdata(dwDevice_t* dev)
 {
 	return dev->userdata;
+}
+
+void dwReadID(dwDevice_t *dev)
+{
+	uint8_t deviceID[5] = {0};
+
+	while (true)
+		dwSpiRead(dev, 0x00, 0x00, deviceID, 4);
 }
 
 int dwConfigure(dwDevice_t* dev)
@@ -146,6 +161,15 @@ int dwConfigure(dwDevice_t* dev)
    // Delay_ms(1);
 
     return DW_ERROR_OK;
+}
+
+void clearInterruptStatusBit(dwDevice_t* dev){
+	dev->sysstatus[0] = 0x00;
+	dev->sysstatus[1] = 0x00;
+	dev->sysstatus[2] = 0x00;
+	dev->sysstatus[3] = 0x02;
+	dev->sysstatus[4] = 0x00;
+	dwSpiWrite(&g_dwDev, SYS_STATUS, NO_SUB, dev->sysstatus, LEN_SYS_STATUS);
 }
 
 void dwManageLDE(dwDevice_t* dev) {
@@ -213,15 +237,18 @@ void dwEnableClock(dwDevice_t* dev, dwClock_t clock) {
 	memset(pmscctrl0, 0, LEN_PMSC_CTRL0);
 	dwSpiRead(dev, PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
 	if(clock == dwClockAuto) {
-		SPIConfig(dwSpiSpeedLow);
+		USART1->CMD = usartDisable;
+		initUSART1(dwSpiSpeedLow);
 		pmscctrl0[0] = dwClockAuto;
 		pmscctrl0[1] &= 0xFE;
 	} else if(clock == dwClockXti) {
-		SPIConfig(dwSpiSpeedLow);
+		USART1->CMD = usartDisable;
+		initUSART1(dwSpiSpeedLow);
 		pmscctrl0[0] &= 0xFC;
 		pmscctrl0[0] |= dwClockXti;
 	} else if(clock == dwClockPll) {
-		SPIConfig(dwSpiSpeedHigh);
+		USART1->CMD = usartDisable;
+		initUSART1(dwSpiSpeedHigh);
 		pmscctrl0[0] &= 0xFC;
 		pmscctrl0[0] |= dwClockPll;
 	} else {
@@ -401,7 +428,7 @@ void dwIdle(dwDevice_t* dev)
 }
 
 void dwNewReceive(dwDevice_t* dev) {
-	dwIdle(dev);
+	//dwIdle(dev);
 	memset(dev->sysctrl, 0, LEN_SYS_CTRL);
 	dwClearReceiveStatus(dev);
 	dev->deviceMode = RX_MODE;
@@ -448,6 +475,8 @@ void dwNewConfiguration(dwDevice_t* dev) {
 }
 
 void dwCommitConfiguration(dwDevice_t* dev) {
+	uint32_t ecctrl = 0x00000004;
+
 	// write all configurations back to device
 	dwWriteNetworkIdAndDeviceAddress(dev);
 	dwWriteSystemConfigurationRegister(dev);
@@ -456,8 +485,7 @@ void dwCommitConfiguration(dwDevice_t* dev) {
 	dwWriteSystemEventMaskRegister(dev);
 	// tune according to configuration
 	dwTune(dev);
-	// TODO clean up code + antenna delay/calibration API
-	// TODO setter + check not larger two bytes integer
+	dwSpiWrite32(dev, EC_CTRL, NO_SUB, ecctrl);
 	// uint8_t antennaDelayBytes[LEN_STAMP];
 	// writeValueToBytes(antennaDelayBytes, 16384, LEN_STAMP);
 	// dev->antennaDelay.setTimestamp(antennaDelayBytes);
@@ -515,6 +543,21 @@ void dwSetTxRxTime(dwDevice_t* dev, const dwTime_t futureTime) {
 	}
 	uint8_t delayBytes[5];
   memcpy(delayBytes, futureTime.raw, sizeof(futureTime.raw));
+	delayBytes[0] = 0;
+	delayBytes[1] &= 0xFE;
+	dwSpiWrite(dev, DX_TIME, NO_SUB, delayBytes, LEN_DX_TIME);
+}
+
+void dwSetTxRxTime2(dwDevice_t* dev, uint8_t futureTime[5]) {
+	if(dev->deviceMode == TX_MODE) {
+		setBit(dev->sysctrl, LEN_SYS_CTRL, TXDLYS_BIT, true);
+	} else if(dev->deviceMode == RX_MODE) {
+		setBit(dev->sysctrl, LEN_SYS_CTRL, RXDLYS_BIT, true);
+	} else {
+		return;
+	}
+	uint8_t delayBytes[5];
+  memcpy(delayBytes, futureTime, 5);
 	delayBytes[0] = 0;
 	delayBytes[1] &= 0xFE;
 	dwSpiWrite(dev, DX_TIME, NO_SUB, delayBytes, LEN_DX_TIME);
@@ -626,33 +669,30 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 		//auto switch to receive state after a bad receive
 		//if double buffer is enable, switch to receive state after a good receive
 		//if double buffer and auto acknowledgment are enable, auto transmit acknowledgment and switch to receive state
-		dwSetReceiverAutoReenable(dev,false);
-		//set auto turn on receiver after a transmit
-		dwWaitForResponse(dev,true);
+
 		//set auto send acknowledgment after receive a frame with a acknowledgment request
-		dwSetAutoAck(dev,true);
-		//set 3us to transmit ACK after receive and 10us to turn on receiver after transmit
-		dwSetAckAndRespTime(dev, 3, 10);
+		dwSetAutoAck(dev,false);
 		//set CRC frame check
-		dwSuppressFrameCheck(dev, false);
+		dwSuppressFrameCheck(dev, true);
 		//set receiver timeout turn-off time
 		dwSetReceiveWaitTimeout(dev,0);
 		//set active high for interrupt
 		dwSetInterruptPolarity(dev, true);
-		//for global frame filtering
-		dwSetFrameFilter(dev, true);
-		//for data frame (poll, poll_ack, range, range report, range failed) filtering
-		dwSetFrameFilterAllowData(dev, true);
-		//for reserved (blink) frame filtering
-		dwSetFrameFilterAllowReserved(dev, false);
-		//for MAC frame filtering
-		dwSetFrameFilterAllowMAC(dev, true);
-		//for BEACON frame filtering
-		dwSetFrameFilterAllowBeacon(dev, false);
-		//for ACK frame filtering
-		dwSetFrameFilterAllowAcknowledgement(dev, true);
-		//sub_node act as coordinator
-		dwSetFrameFilterBehaveCoordinator(dev, true);
+
+//		//for global frame filtering
+//		dwSetFrameFilter(dev, true);
+//		//for data frame (poll, poll_ack, range, range report, range failed) filtering
+//		dwSetFrameFilterAllowData(dev, true);
+//		//for reserved (blink) frame filtering
+//		dwSetFrameFilterAllowReserved(dev, false);
+//		//for MAC frame filtering
+//		dwSetFrameFilterAllowMAC(dev, true);
+//		//for BEACON frame filtering
+//		dwSetFrameFilterAllowBeacon(dev, false);
+//		//for ACK frame filtering
+//		dwSetFrameFilterAllowAcknowledgement(dev, false);
+//		//sub_node act as coordinator
+//		dwSetFrameFilterBehaveCoordinator(dev, true);
 
 		//interrupt active for complete transmit
 		dwInterruptOnSent(dev, true);
@@ -665,12 +705,13 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 		//interrupt active for receive time stamp when time stamp is enable
 		dwInterruptOnReceiveTimestampAvailable(dev, false);
 		//interrupt active for auto acknowledgment trigger when time auto acknowledgment is enable
-		dwInterruptOnAutomaticAcknowledgeTrigger(dev, true);
+		dwInterruptOnAutomaticAcknowledgeTrigger(dev, false);
 
 		// default mode when powering up the chip
 		// still explicitly selected for later tuning
 	}
 }
+
 
 void dwSetSubNodeConfig(dwDevice_t* dev) {
 	if(dev->deviceMode == TX_MODE) {
@@ -690,37 +731,34 @@ void dwSetSubNodeConfig(dwDevice_t* dev) {
 		//if double buffer is enable, switch to receive state after a good receive
 		//if double buffer and auto acknowledgment are enable, auto transmit acknowledgment and switch to receive state
 		dwSetReceiverAutoReenable(dev,false);
-		//set auto turn on receiver after a transmit
-		dwWaitForResponse(dev,true);
+		dwWaitForResponse(dev,false);
 		//set auto send acknowledgment after receive a frame with a acknowledgment request
-		dwSetAutoAck(dev,true);
-		//set 3us to transmit ACK after receive and 30us to turn on receiver after transmit
-		dwSetAckAndRespTime(dev, 3, 30);
+		dwSetAutoAck(dev,false);
 		//set CRC frame check
 		dwSuppressFrameCheck(dev, false);
 		//set receiver timeout turn-off time
-		dwSetReceiveWaitTimeout(dev,0);
+		//dwSetReceiveWaitTimeout(dev,0);
+		dwSetInterruptPolarity(dev, true);
 
 		//for global frame filtering
-		dwSetFrameFilter(dev, true);
-		//for data frame (poll, poll_ack, range, range report, range failed) filtering
-		dwSetFrameFilterAllowData(dev, true);
-		//for reserved (blink) frame filtering
-		dwSetFrameFilterAllowReserved(dev, false);
-		//for MAC frame filtering
-		dwSetFrameFilterAllowMAC(dev, true);
-		//for BEACON frame filtering
-		dwSetFrameFilterAllowBeacon(dev, false);
-		//for ACK frame filtering
-		dwSetFrameFilterAllowAcknowledgement(dev, true);
-		//sub_node act as coordinator
-		dwSetFrameFilterBehaveCoordinator(dev, true);
+//		dwSetFrameFilter(dev, true);
+//		//for data frame (poll, poll_ack, range, range report, range failed) filtering
+//		dwSetFrameFilterAllowData(dev, true);
+//		//for reserved (blink) frame filtering
+//		dwSetFrameFilterAllowReserved(dev, false);
+//		//for MAC frame filtering
+//		dwSetFrameFilterAllowMAC(dev, true);
+//		//for BEACON frame filtering
+//		dwSetFrameFilterAllowBeacon(dev, false);
+//		//for ACK frame filtering
+//		dwSetFrameFilterAllowAcknowledgement(dev, false);
+//		//sub_node act as coordinator
+//		dwSetFrameFilterBehaveCoordinator(dev, false);
 
-
-		dwInterruptOnSent(dev, true);
+		dwInterruptOnSent(dev, false);
 		dwInterruptOnReceived(dev, true);
 		dwInterruptOnReceiveTimeout(dev, false);
-		dwInterruptOnReceiveFailed(dev, false);
+		dwInterruptOnReceiveFailed(dev, true);
 		dwInterruptOnReceiveTimestampAvailable(dev, false);
 		dwInterruptOnAutomaticAcknowledgeTrigger(dev, false);
 
@@ -1355,7 +1393,9 @@ void dwTune(dwDevice_t *dev) {
 void (*_handleError)(void) = dummy;
 void (*_handleReceiveTimestampAvailable)(void) = dummy;
 
-void dwHandleInterrupt(dwDevice_t *dev) {
+void dwHandleInterrupt(dwDevice_t *dev)
+{
+	g_spiTransDes.uwbIRQOccur = true;
 	// read current status and handle via callbacks
 	dwReadSystemEventStatusRegister(dev);
 	if(dwIsClockProblem(dev) /* TODO and others */ && _handleError != 0) {
@@ -1365,10 +1405,10 @@ void dwHandleInterrupt(dwDevice_t *dev) {
 		dwClearTransmitStatus(dev);
 		(*dev->handleSent)(dev);
 	}
-	if(dwIsReceiveTimestampAvailable(dev) && _handleReceiveTimestampAvailable != 0) {
-		dwClearReceiveTimestampAvailableStatus(dev);
-		(*_handleReceiveTimestampAvailable)();
-	}
+//	if(dwIsReceiveTimestampAvailable(dev) && _seceiveTimestampAvailable != 0) {
+//		dwClearReceiveTimestampAvailableStatus(dev);
+//		(*_handleReceiveTimestampAvailable)();
+//	}
 	if(dwIsReceiveFailed(dev)) {
 		dwClearReceiveStatus(dev);
 		dwRxSoftReset(dev); // Needed due to error in the RX auto-re-enable functionality. See page 35 of DW1000 manual, v2.13.
@@ -1379,16 +1419,16 @@ void dwHandleInterrupt(dwDevice_t *dev) {
 				dwStartReceive(dev);
 			}
 		}
-	} else if(dwIsReceiveTimeout(dev)) {
-		dwClearReceiveStatus(dev);
-		dwRxSoftReset(dev); // Needed due to error in the RX auto-re-enable functionality. See page 35 of DW1000 manual, v2.13.
-		if(dev->handleReceiveTimeout != 0) {
-			(*dev->handleReceiveTimeout)(dev);
-			if(dev->permanentReceive) {
-				dwNewReceive(dev);
-				dwStartReceive(dev);
-			}
-		}
+//	} else if(dwIsReceiveTimeout(dev)) {
+//		dwClearReceiveStatus(dev);
+//		dwRxSoftReset(dev); // Needed due to error in the RX auto-re-enable functionality. See page 35 of DW1000 manual, v2.13.
+//		if(dev->handleReceiveTimeout != 0) {
+//			(*dev->handleReceiveTimeout)(dev);
+//			if(dev->permanentReceive) {
+//				dwNewReceive(dev);
+//				dwStartReceive(dev);
+//			}
+//		}
 	} else if(dwIsReceiveDone(dev) && dev->handleReceived != 0) {
 		dwClearReceiveStatus(dev);
 		(*dev->handleReceived)(dev);
@@ -1490,6 +1530,59 @@ static void readBytesOTP(dwDevice_t* dev, uint16_t address, uint8_t data[]) {
 	dwSpiWrite8(dev, OTP_IF, OTP_CTRL_SUB, 0x00);
 }
 
+void dwSetSleep(dwDevice_t *dev){
+
+	uint8_t pmsc_ctrl1[4];
+	uint8_t aon_wcfg[2];
+	uint8_t aon_cfg0[4];
+	uint8_t aon_cfg1[2];
+	uint8_t aon_ctrl[1];
+	aon_ctrl[0] = 0x00;
+	dwSpiWrite(dev, AON, AON_CTRL_SUB, aon_ctrl, LEN_AON_CTRL); //reset AON_CTRL
+	Delay_ms(1);
+
+	dwSpiRead(dev, PMSC, PMSC_CTRL1_SUB, pmsc_ctrl1, LEN_PMSC_CTRL1);
+	Delay_ms(1);
+	dwSpiRead(dev, AON, AON_CFG0_SUB, aon_cfg0, LEN_AON_CFG0);
+	Delay_ms(1);
+	dwSpiRead(dev, AON, AON_WCFG_SUB, aon_wcfg, LEN_AON_WCFG);
+	Delay_ms(1);
+
+//	setBit(pmsc_ctrl1, LEN_PMSC_CTRL1, ATXSLP, true);
+//	dwSpiWrite(dev, PMSC, PMSC_CTRL1_SUB, pmsc_ctrl1, LEN_PMSC_CTRL1);
+
+	memset(aon_cfg1, 0x00, 2);
+	dwSpiWrite(dev, AON, AON_CFG1_SUB, aon_cfg1, LEN_AON_CFG1); //clear AON_CFG1
+
+//	dwClearInterrupts(dev);
+//	dwWriteSystemEventMaskRegister(dev); //set interrupt when device waked up
+
+	setBit(aon_wcfg, LEN_AON_WCFG, ONW_RX, false);
+	setBit(aon_wcfg, LEN_AON_WCFG, ONW_LDC, false);
+	setBit(aon_wcfg, LEN_AON_WCFG, ONW_LLDO0, false);
+	dwSpiWrite(dev, AON, AON_WCFG_SUB, aon_wcfg, LEN_AON_WCFG); //Configure WCFG
+
+	setBit(aon_cfg0, LEN_AON_CFG0, SLEEP_EN, true);
+	setBit(aon_cfg0, LEN_AON_CFG0, WAKE_PIN, true);
+	setBit(aon_cfg0, LEN_AON_CFG0, WAKE_SPI, false);
+	setBit(aon_cfg0, LEN_AON_CFG0, WAKE_CNT, false);
+	dwSpiWrite(dev, AON, AON_CFG0_SUB, aon_cfg0, LEN_AON_CFG0); //Configure CFG0
+
+	setBit(aon_ctrl, LEN_AON_CTRL, UPL_CFG, true);
+	setBit(aon_ctrl, LEN_AON_CTRL, SAVE, true);
+	setBit(aon_ctrl, LEN_AON_CTRL, RESTORE, false);
+	dwSpiWrite(dev, AON, AON_CTRL_SUB, aon_ctrl, LEN_AON_CTRL); //Enter Sleep
+}
+
+void dwRetoreConfigFromAON(dwDevice_t *dev){
+	uint8_t aon_ctrl[1] = {};
+	dwSpiRead(dev, AON, AON_CTRL_SUB, aon_ctrl, 1);
+	setBit(aon_ctrl, LEN_AON_CTRL, UPL_CFG, false);
+	setBit(aon_ctrl, LEN_AON_CTRL, SAVE, false);
+	setBit(aon_ctrl, LEN_AON_CTRL, RESTORE, true);
+	dwSpiWrite(dev, AON, AON_CTRL_SUB, aon_ctrl, 1);
+}
+
 void dwSetAfterRxAutoSleep(dwDevice_t *dev){
     uint32_t pmsc_ctrl1;
     pmsc_ctrl1 = 0x81023738; //EN ARXSLP,EN SNPOZE
@@ -1522,7 +1615,7 @@ void dwSetAONWakeUpConfig(dwDevice_t *dev){
 	//wake load configuration from AON
 	//wake preserve sleep after fail receive
 	//wake load LDO Tune value
-	aon_wcfg = 0x1142;
+	aon_wcfg = 0x19C2;
 	dwSpiWrite16(dev, AON, AON_WCFG_SUB, aon_wcfg);
 }
 
@@ -1530,7 +1623,7 @@ void dwLowPowerListenMode(dwDevice_t *dev, uint32_t listen_timeout_us, uint32_t 
 	uint16_t listen_timeout;
 	uint8_t timeout_snoze;
 	listen_timeout = listen_timeout_us/dev->pacSize;
-	timeout_snoze = timeout_snoze_us*19/512;
+	timeout_snoze = timeout_snoze_us*192/10/512;
 	dwSetAfterRxAutoSleep(dev);
 	dwSetPreambleDectTimeOut(dev, listen_timeout);
 	dwSetSnozeTime(dev, timeout_snoze);
@@ -1588,14 +1681,23 @@ void GPIO_ODD_IRQHandler(void)
 	dwHandleInterrupt(&g_dwDev);
 }
 
-#define  gpioPortB_11 11
+//void dwGpioInterruptConfig(dwDevice_t *dev)
+//{
+//	CMU_ClockEnable(cmuClock_GPIO, true);
+//	GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 1);
+//	NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
+//	NVIC_EnableIRQ(GPIO_ODD_IRQn);
+//	GPIO_ExtIntConfig(gpioPortB, gpioPortB_11, gpioPortB_11, false, true, true);
+//}
+
 void dwGpioInterruptConfig(dwDevice_t *dev)
 {
-	CMU_ClockEnable(cmuClock_GPIO, true);
-	GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 1);
-	NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
-	NVIC_EnableIRQ(GPIO_ODD_IRQn);
-	GPIO_ExtIntConfig(gpioPortB, gpioPortB_11, gpioPortB_11, false, true, true);
+	 CMU_ClockEnable(cmuClock_GPIO, true);
+	 GPIO_PinModeSet(gpioPortB, gpioPortB_11, gpioModeInputPullFilter, 1);
+	 NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
+	 NVIC_SetPriority(GPIO_ODD_IRQn,1);
+	 NVIC_EnableIRQ(GPIO_ODD_IRQn);
+	 GPIO_ExtIntConfig(gpioPortB, gpioPortB_11, gpioPortB_11, true, false, true);
 }
 
 /*
@@ -1619,24 +1721,61 @@ void dwDeviceInit(dwDevice_t *dev)
 /*
  * send data to slave
  * */
-void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len)
+void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_time_us)
 {
 	dwNewTransmit(dev);
 	dwSetData(dev, data, len);
+	dwWaitForResponse(dev,true); //set auto turn on receiver after a transmit
 	dwStartTransmit(dev);
+	dwSetAckAndRespTime(dev, 0, resp_time_us); //set 3us to transmit ACK after receive and 500us to turn on receiver after transmit
+
+//	dwIdle(dev);
+//	dwNewReceive(dev);
+//	dwStartReceive(dev);
 }
 
 /*
  * receive data from slave
  * */
+//volatile int g_cnt = 0;
+
 void dwRecvData(dwDevice_t *dev)
 {
-	int len = 0;
+	//int len = sizeof(g_recvSlaveFr);
+	int len = 11;
+	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
+//	len = dwGetDataLength(dev);
 
+//	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
+//	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
+//	g_dataRecvDone = true;
+
+	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
+
+	if ((((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) || ((g_recvSlaveFr.frameCtrl & 0xff) == 0x00)) && (((g_recvSlaveFr.frameType & 0x0f) % 2)== 1)){
+
+		enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
+
+		//g_dataRecvDone = true;
+//		if(g_recvSlaveFr.frameType == 0x03){
+//			g_cnt += 1;
+//		}
+	}
+	else{
+		dwNewReceive(dev);
+		dwStartReceive(dev);
+		//g_dataRecvDone = false;
+	}
+}
+
+void dwSentData(dwDevice_t *dev)
+{
+//	g_dataSend_time = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1);
+}
+
+void dwReceiveFailed(dwDevice_t *dev)
+{
 	dwNewReceive(dev);
 	dwStartReceive(dev);
-	len = dwGetDataLength(dev);
-	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
-	memcpy(&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
-	enqueueFrame(&g_ReceivedPacketQueue, &g_recvSlaveFr);
+
 }

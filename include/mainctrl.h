@@ -48,7 +48,11 @@ enum {
 	ENUM_SLAVE_STATUS,
 	ENUM_SLAVE_STATUS_TOKEN,
 	ENUM_SLAVE_SLEEP,
-	ENUM_SLAVE_SLEEP_TOKEN
+	ENUM_SLAVE_SLEEP_TOKEN,
+	ENUM_SLAVE_SYNC,
+	ENUM_SLAVE_SYNC_TOKEN,
+	ENUM_REPEAT_DATA,
+	ENUM_REPEAT_DATA_TOKEN
 };
 
 typedef struct {
@@ -57,30 +61,38 @@ typedef struct {
 	uint16_t srcId;
 } devInfo_t;
 
-#define FRAME_DATA_LEN 5
+
+#define FRAME_DATA_LEN 64
+#define FRAME_LEN 76
+//#define FRAME_DATA_LEN 100
+//#define FRAME_LEN 112
 
 struct MainCtrlFrame {
-	uint8_t head0; //0x55
-	uint8_t head1; //0xaa
+	uint8_t head0; //0xeb
+	uint8_t head1; //0x90
 	uint8_t len; // data len
+	uint8_t frameID;
 	uint8_t serial; // serial num: 0-255
+	uint8_t frameCtrl_blank[3];
 	uint8_t frameCtrl;
 	uint8_t frameType;
+	uint8_t adcIndex;
 	uint8_t data[FRAME_DATA_LEN];
 	uint8_t crc0; // crc[7:0]
-	uint8_t crc1; // crc[15:8]
 };
 
 struct BackTokenFrame {
-	uint8_t head0; //0x55
-	uint8_t head1; //0xaa
+	uint8_t head0; //0xeb
+	uint8_t head1; //0x90
 	uint8_t len; // data len
+	uint8_t frameID;
 	uint8_t serial; // serial num: 0-255
+	uint8_t frameCtrl_blank[3];
 	uint8_t frameCtrl;
 	uint8_t frameType;
+	uint8_t blank;
 	uint8_t data[FRAME_DATA_LEN];
 	uint8_t crc0; // crc[7:0]
-	uint8_t crc1; // crc[15:8]
 };
 
 /*
@@ -99,18 +111,33 @@ struct ReceivedPacketQueue g_ReceivedPacketQueue;
 
 volatile uint8_t g_cur_mode;
 
+uint8_t frm_cnt;
+
 /*
  * true: received new cmd
  * false: received no cmd
  * */
 bool g_received_cmd;
-
+bool g_received_wait;
 bool g_dataRecvDone;
+uint32_t g_dataRecv_time;
+uint32_t g_dataSend_time;
+
+bool g_AD_start;
+
+uint8_t adc_index;
+
+uint32_t delay_us;
+uint32_t delay_sync_us;
+uint32_t delay_sync_ms;
+uint8_t frm_cnt_init;
+uint8_t slave_adc_index;
 
 extern void globalInit(void);
 extern void sleepAndRestore(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
 extern int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame);
 extern void enqueueFrame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr);
+extern void powerADandUWB(uint8_t master);
 
 #endif

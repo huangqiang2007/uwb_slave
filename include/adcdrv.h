@@ -2,9 +2,14 @@
 #define ADCDRV_H_
 
 #include "main.h"
+#include "mainctrl.h"
 
 #define ADC_CHNL_NUM 1
 #define ADC_SAMPLE_BUFFER_NUM 10
+
+#define ADCSAMPLES 64
+
+volatile uint32_t g_batteryVol;
 
 /*
  * one ADC sample buffer, the total buffer size 100 * 7 bytes
@@ -13,7 +18,7 @@
  * @adc_sample_buffer: the array stores the sampled data
  * */
 typedef struct {
-	uint8_t adc_sample_buffer[ADC_CHNL_NUM];
+	uint8_t adc_sample_buffer[FRAME_DATA_LEN];
 } ADC_SAMPLE_BUFFERDef;
 
 /*
@@ -27,11 +32,22 @@ typedef struct {
 typedef struct {
 	volatile int8_t samples;
 	int8_t in, out;
-	volatile uint8_t adc_smaple_data[ADC_SAMPLE_BUFFER_NUM];
+	ADC_SAMPLE_BUFFERDef adc_smaple_data[Q_LEN];
 } AdcSampleDataQueueDef;
 
 AdcSampleDataQueueDef g_adcSampleDataQueue;
 
+bool s_index_chg;
+
 extern void ADCStart(void);
+extern void initADC(void);
+extern void ADCPoll(void);
+ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue);
+void pollADCForBattery (void);
+void ADC0_Reset(void);
+void prsTimerAdc(void);
+void collectSamples(uint16_t dataBuf[]);
+uint32_t ADC_Calibration(ADC_TypeDef *adc, ADC_Ref_TypeDef ref);
+void readADC(void);
 
 #endif /* ADCDRV_H_ */

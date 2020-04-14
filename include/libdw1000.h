@@ -29,8 +29,12 @@
 
 dwDevice_t g_dwDev;
 
+#define SLAVE_IDNUM 0x01
+#define gpioPortB_11 11
+
 enum {PAN_ID1 = 0x0001, PAN_ID2};
 enum {SLAVE_ADDR1 = 0x0001, SLAVE_ADDR2, SLAVE_ADDR3, SLAVE_ADDR4};
+enum {CENTER_ADDR1 = 0x0011, CENTER_ADDR2};
 
 // Default Mode of operation
 extern const uint8_t MODE_LONGDATA_RANGE_LOWPOWER[];
@@ -133,7 +137,7 @@ void dwInterruptOnReceiveTimeout(dwDevice_t* dev, bool val);
 void dwInterruptOnReceiveTimestampAvailable(dwDevice_t* dev, bool val);
 void dwInterruptOnAutomaticAcknowledgeTrigger(dwDevice_t* dev, bool val);
 void dwClearInterrupts(dwDevice_t* dev);
-
+void UDELAY_Calibrate(void);
 void dwIdle(dwDevice_t* dev);
 void dwNewReceive(dwDevice_t* dev);
 void dwStartReceive(dwDevice_t* dev);
@@ -179,6 +183,8 @@ float dwGetReceivePower(dwDevice_t* dev);
 void dwEnableMode(dwDevice_t *dev);
 void dwTune(dwDevice_t *dev);
 void dwHandleInterrupt(dwDevice_t *dev);
+void dwSetSleep(dwDevice_t *dev);
+void dwRetoreConfigFromAON(dwDevice_t *dev);
 void dwSetAfterRxAutoSleep(dwDevice_t *dev);
 void dwNotSetAfterRxAutoSleep(dwDevice_t *dev);
 void dwSetPreambleDectTimeOut(dwDevice_t *dev, uint16_t timeout_PAC_Size);
@@ -224,11 +230,14 @@ void dwTxBufferFrameEncode(dwMacFrame_t* frame, bool isDataFrame, bool AckReques
  * */
 extern void dwDeviceInit(dwDevice_t *dev);
 
-void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len);
+void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_time_us);
 void dwRecvData(dwDevice_t *dev);
+void dwSentData(dwDevice_t *dev);
+void dwReceiveFailed(dwDevice_t *dev);
 
 /* Error codes */
 #define DW_ERROR_OK 0
 #define DW_ERROR_WRONG_ID 1
+
 
 #endif //__LIBDW1000_H__

@@ -208,7 +208,7 @@ void UDELAY_Calibrate(void)
     CMU_ClockDivSet(cmuClock_RTC, rtcClkDiv);
     RTC_FreezeEnable(true);
     #if defined(_EFM32_GECKO_FAMILY)
-    RTC_Sync(RTC_SYNCBUSY_COMP0 | RTC_SYNCBUSY_COMP1 | RTC_SYNCBUSY_CTRL);
+//    RTC_Sync(RTC_SYNCBUSY_COMP0 | RTC_SYNCBUSY_COMP1 | RTC_SYNCBUSY_CTRL);
     #endif
     RTC->COMP0 = rtcComp0;
     RTC->COMP1 = rtcComp1;

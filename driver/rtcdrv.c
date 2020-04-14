@@ -7,7 +7,7 @@
 #include "em_gpio.h"
 #include "timer.h"
 
-#define DELAY_SECONDS 3.0
+#define DELAY_SECONDS 300.0
 #define LFXOFREQ      32768
 #define COMPARE_TOP   (DELAY_SECONDS * LFXOFREQ - 1)
 
@@ -17,7 +17,7 @@
 void RTC_IRQHandler(void)
 {
 	//Reset counter
-	//RTC_CounterReset();
+	RTC_CounterReset();
 
 	// Clear the interrupt source
 	RTC_IntClear(RTC_IFC_COMP0);
@@ -41,7 +41,7 @@ void RtcSetup(void)
 	CMU_OscillatorEnable(cmuOsc_LFRCO, true, true);
 
 	// Turn on the clock for Low Energy clocks
-	CMU_ClockEnable(cmuClock_HFLE, true);
+	//CMU_ClockEnable(cmuClock_HFLE, true);
 	CMU_ClockSelectSet(cmuClock_LFA, cmuSelect_LFRCO);
 
 	// Turn on the RTC clock
@@ -49,6 +49,8 @@ void RtcSetup(void)
 
 	// Set RTC compare value for RTC 0
 	RTC_CompareSet(0, COMPARE_TOP);
+
+	RTC_IntClear(RTC_IFC_COMP0 | RTC_IFC_COMP1);
 
 	// Allow channel 0 to cause an interrupt
 	RTC_IntEnable(RTC_IEN_COMP0);
