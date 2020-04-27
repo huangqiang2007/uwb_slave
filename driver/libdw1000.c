@@ -68,6 +68,11 @@ static void dummy(){
 //	tx_times = tx_start_times - tx_finish_times;
 }
 
+static void ReceiveTimestamp(){
+	dwGetRawReceiveTimestamp(&g_dwDev, &g_dwTime);
+	//TE = TIMER_CounterGet(TIMER1);
+}
+
 void dwInit(dwDevice_t* dev, uint16_t PanID, uint16_t sourceAddr)
 {
 	dev->userdata = NULL;
@@ -487,7 +492,7 @@ void dwCommitConfiguration(dwDevice_t* dev) {
 	dwTune(dev);
 	dwSpiWrite32(dev, EC_CTRL, NO_SUB, ecctrl);
 	// uint8_t antennaDelayBytes[LEN_STAMP];
-	// writeValueToBytes(antennaDelayBytes, 16384, LEN_STAMP);
+	// writeValueToBytes(antennaDelayBytes, 16384, LEN_);
 	// dev->antennaDelay.setTimestamp(antennaDelayBytes);
 	// dwSpiRead(dev, TX_ANTD, NO_SUB, antennaDelayBytes, LEN_TX_ANTD);
    // dwSpiRead(dev, LDE_IF, LDE_RXANTD_SUB, antennaDelayBytes, LEN_LDE_RXANTD);
@@ -695,7 +700,7 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 //		dwSetFrameFilterBehaveCoordinator(dev, true);
 
 		//interrupt active for complete transmit
-		dwInterruptOnSent(dev, true);
+		dwInterruptOnSent(dev, false);
 		//interrupt active for complete receive
 		dwInterruptOnReceived(dev, true);
 		//interrupt active for receiver timeout when dwSetReceiveWaitTimeout() is enable true
@@ -703,7 +708,7 @@ void dwSetcentreNodeConfig(dwDevice_t* dev) {
 		//interrupt active for receive error
 		dwInterruptOnReceiveFailed(dev, true);
 		//interrupt active for receive time stamp when time stamp is enable
-		dwInterruptOnReceiveTimestampAvailable(dev, false);
+		dwInterruptOnReceiveTimestampAvailable(dev, true);
 		//interrupt active for auto acknowledgment trigger when time auto acknowledgment is enable
 		dwInterruptOnAutomaticAcknowledgeTrigger(dev, false);
 
@@ -809,19 +814,33 @@ void dwGetData(dwDevice_t* dev, uint8_t data[], unsigned int n) {
 }
 
 void dwGetTransmitTimestamp(dwDevice_t* dev, dwTime_t* time) {
-	dwSpiRead(dev, TX_TIME, TX_STAMP_SUB, time->raw, LEN_TX_STAMP);
+
+    //dwSpiRead(dev, TX_TIME, TX_STAMP_SUB, time->raw, LEN_TX_STAMP);
+	time->low32 = dwSpiRead32(dev, TX_TIME, TX_RAWSTAMP_L_SUB);
+	time->high32 = dwSpiRead32(dev, TX_TIME, TX_RAWSTAMP_H_SUB);
+	time->full = (time->high32 & 0x0000ffff) << 16;
+	time->full |= (time->low32 >> 16) & 0x0000ffff; //250MHz per unit
+	RTT_t = (time->full / 10) >> 3; //25MHz/8
 }
 
 void dwGetReceiveTimestamp(dwDevice_t* dev, dwTime_t* time) {
-  time->full = 0;
+    time->full = 0;
 	dwSpiRead(dev, RX_TIME, RX_STAMP_SUB, time->raw, LEN_RX_STAMP);
 	// correct timestamp (i.e. consider range bias)
 	dwCorrectTimestamp(dev, time);
+
 }
 
 void dwGetRawReceiveTimestamp(dwDevice_t* dev, dwTime_t* time) {
-  time->full = 0;
-	dwSpiRead(dev, RX_TIME, RX_STAMP_SUB, time->raw, LEN_RX_STAMP);
+	uint32_t RTT_r;
+//    time->full = 0;
+//	dwSpiRead(dev, RX_TIME, RX_STAMP_SUB, time->raw, LEN_RX_STAMP);
+	time->low32 = dwSpiRead32(dev, RX_TIME, RX_RAWSTAMP_L_SUB);
+	time->high32 = dwSpiRead32(dev, RX_TIME, RX_RAWSTAMP_H_SUB);
+	time->full = (time->high32 & 0x0000ffff) << 16;
+	time->full |= (time->low32 >> 16) & 0x0000ffff; //250MHz per unit
+	RTT_r = (time->full / 10) >> 3; //25MHz/8 per mcu timer unit
+	TOA_r = RTT_r - RTT_t;
 }
 
 void dwCorrectTimestamp(dwDevice_t* dev, dwTime_t* timestamp) {
@@ -1391,7 +1410,7 @@ void dwTune(dwDevice_t *dev) {
 
 // FIXME: This is a test!
 void (*_handleError)(void) = dummy;
-void (*_handleReceiveTimestampAvailable)(void) = dummy;
+void (*_handleReceiveTimestampAvailable)(void) = ReceiveTimestamp;
 
 void dwHandleInterrupt(dwDevice_t *dev)
 {
@@ -1405,7 +1424,7 @@ void dwHandleInterrupt(dwDevice_t *dev)
 		dwClearTransmitStatus(dev);
 		(*dev->handleSent)(dev);
 	}
-//	if(dwIsReceiveTimestampAvailable(dev) && _seceiveTimestampAvailable != 0) {
+//	if(dwIsReceiveTimestampAvailable(dev) && _handleReceiveTimestampAvailable != 0) {
 //		dwClearReceiveTimestampAvailableStatus(dev);
 //		(*_handleReceiveTimestampAvailable)();
 //	}
@@ -1745,11 +1764,9 @@ void dwRecvData(dwDevice_t *dev)
 	int len = 11;
 	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
 //	len = dwGetDataLength(dev);
-
+	//TE = TIMER_CounterGet(TIMER1);
 //	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
-//	memcpy((uint8_t *)&g_recvSlaveFr, g_dwMacFrameRecv.Payload, sizeof(g_recvSlaveFr));
 //	g_dataRecvDone = true;
-
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
 	if ((((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) || ((g_recvSlaveFr.frameCtrl & 0xff) == 0x00)) && (((g_recvSlaveFr.frameType & 0x0f) % 2)== 1)){
@@ -1771,6 +1788,7 @@ void dwRecvData(dwDevice_t *dev)
 void dwSentData(dwDevice_t *dev)
 {
 //	g_dataSend_time = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1);
+	dwGetTransmitTimestamp(dev, &g_dwTime);
 }
 
 void dwReceiveFailed(dwDevice_t *dev)
@@ -1779,3 +1797,5 @@ void dwReceiveFailed(dwDevice_t *dev)
 	dwStartReceive(dev);
 
 }
+
+

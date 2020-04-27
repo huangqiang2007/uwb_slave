@@ -78,7 +78,7 @@ int main(void)
 	clockConfig();
 
 	SET_NUM = 5;
-	DEV_NUM = 4;
+	DEV_NUM = 1;
 	UWB_Default.subnode_id = DEV_NUM + ((SET_NUM-1)<<2);
 	if (DEV_NUM == 1 || DEV_NUM == 2) {
 		UWB_Default.AD_Samples = 50;
@@ -178,7 +178,7 @@ int main(void)
 				break;
 
 			case SLAVE_SAMPLEMODE:
-				ParsePacket(&g_dwDev, &g_dwMacFrameSend);
+				ParsePacket(&g_dwDev);
 				break;
 
 			case SLAVE_RTCIDLEMODE:

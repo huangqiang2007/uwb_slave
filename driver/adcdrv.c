@@ -108,6 +108,7 @@ ADC_SAMPLE_BUFFERDef *dequeueSample(AdcSampleDataQueueDef *adcSampleDataQueue)
 void initADC (void)
 {
 	ADC_Reset(ADC0);
+	ADC_int_active = 0;
 
 	// Enable ADC0 clock
 	CMU_ClockEnable(cmuClock_ADC0, true);
@@ -163,7 +164,7 @@ void ADC0_IRQHandler(void)
 //	cnt++;
 
 	readADC();
-
+	//ADC_int_active = 1;
 	// Start next ADC conversion
 	//ADC_Start(ADC0, adcStartSingle);
 }

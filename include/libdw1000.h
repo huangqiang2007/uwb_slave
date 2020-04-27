@@ -28,6 +28,7 @@
 #include "libdw1000Spi.h"
 
 dwDevice_t g_dwDev;
+dwTime_t g_dwTime;
 
 #define SLAVE_IDNUM 0x01
 #define gpioPortB_11 11
@@ -234,6 +235,7 @@ void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_tim
 void dwRecvData(dwDevice_t *dev);
 void dwSentData(dwDevice_t *dev);
 void dwReceiveFailed(dwDevice_t *dev);
+
 
 /* Error codes */
 #define DW_ERROR_OK 0

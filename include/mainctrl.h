@@ -62,10 +62,12 @@ typedef struct {
 } devInfo_t;
 
 
-#define FRAME_DATA_LEN 64
-#define FRAME_LEN 76
-//#define FRAME_DATA_LEN 100
-//#define FRAME_LEN 112
+//#define FRAME_DATA_LEN 64
+//#define FRAME_LEN 76
+#define FRAME_DATA_LEN 110
+#define FRAME_LEN 122
+
+#define RECV_TRUNON_TIME 16000
 
 struct MainCtrlFrame {
 	uint8_t head0; //0xeb
@@ -106,7 +108,7 @@ struct ReceivedPacketQueue {
 };
 
 struct MainCtrlFrame g_mainCtrlFr, g_recvSlaveFr;
-dwMacFrame_t g_dwMacFrameSend, g_dwMacFrameRecv;
+//dwMacFrame_t g_dwMacFrameSend, g_dwMacFrameRecv;
 struct ReceivedPacketQueue g_ReceivedPacketQueue;
 
 volatile uint8_t g_cur_mode;
@@ -132,11 +134,16 @@ uint32_t delay_sync_us;
 uint32_t delay_sync_ms;
 uint8_t frm_cnt_init;
 uint8_t slave_adc_index;
+//uint32_t timer;
+uint32_t RTT_t;
+uint32_t TOA_r;
+uint32_t TE;
+uint32_t TE_temp;
 
 extern void globalInit(void);
 extern void sleepAndRestore(void);
 extern uint16_t CalFrameCRC(uint8_t data[], int len);
-extern int ParsePacket(dwDevice_t *dev, dwMacFrame_t *dwMacFrame);
+extern int ParsePacket(dwDevice_t *dev);
 extern void enqueueFrame(struct ReceivedPacketQueue *frameQueue, struct MainCtrlFrame *mainCtrlFr);
 extern void powerADandUWB(uint8_t master);
 

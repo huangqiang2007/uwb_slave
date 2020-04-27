@@ -10,6 +10,7 @@
 #define ADCSAMPLES 64
 
 volatile uint32_t g_batteryVol;
+volatile uint8_t ADC_int_active;
 
 /*
  * one ADC sample buffer, the total buffer size 100 * 7 bytes

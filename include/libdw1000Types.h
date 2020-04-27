@@ -33,6 +33,7 @@ struct dwDevice_s;
 typedef union dwTime_u {
   uint8_t raw[5];
   uint64_t full;
+  uint32_t timer;
   struct {
     uint32_t low32;
     uint8_t high8;
@@ -88,17 +89,6 @@ typedef struct dwDevice_s {
   uint32_t txPower;
   bool forceTxPower;
 } dwDevice_t;
-
-//typedef struct dwFrame_s {
-//	uint8_t frameControlHigh;
-//	uint8_t frameControlLow;
-//	uint8_t  seqNum;
-//	uint16_t DestPanID;
-//	uint16_t DestAddr;
-//	uint16_t SourcePanID;
-//	uint16_t SourceAddr;
-//	uint8_t  Payload[113];
-//} __attribute__((packed)) dwMacFrame_t;
 
 typedef struct dwFrame_s {
 	uint8_t  Payload[113];
