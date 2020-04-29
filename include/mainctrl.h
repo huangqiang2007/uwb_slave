@@ -132,7 +132,6 @@ uint8_t adc_index;
 uint32_t delay_us;
 uint32_t delay_sync_us;
 uint32_t delay_sync_ms;
-uint8_t frm_cnt_init;
 uint8_t slave_adc_index;
 //uint32_t timer;
 uint32_t RTT_t;

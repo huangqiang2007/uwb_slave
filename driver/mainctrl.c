@@ -42,7 +42,7 @@ void globalInit(void)
 //	memset(&g_dwMacFrameSend, 0x00, sizeof(g_dwMacFrameSend));
 	memset((void *)&g_dwDev, 0x00, sizeof(g_dwDev));
 
-	frm_cnt = frm_cnt_init;
+	frm_cnt = 0;
 	slave_adc_index = 0;
 	s_index_chg = false;
 	free_frm_status = false;
@@ -116,37 +116,51 @@ void sleepAndRestore(void)
 	//g_idle_bat_ad_time = g_Ticks + BAT_AD_TIME;
 }
 
-void time_sync(struct MainCtrlFrame *pMainCtrlFrame){
-	uint32_t TE_dif;
-	uint32_t t0, t1;
-	int32_t TE_dif_std_temp;
+int32_t time_sync(struct MainCtrlFrame *pMainCtrlFrame){
+
+	int32_t t0, t1;
+//	int32_t TE_dif_std_temp;
 	static uint32_t TE_mean = 0;
-	static int32_t TE_dif_std=0;
-	static uint32_t TE_reg_temp=0;
+	static uint32_t TE_temp = 0;
+//	static int32_t TE_dif_std=0;
+//	static uint32_t TE_reg_temp=0;
+	int32_t TE_dif_temp;
+	static int32_t TE_dif=0;
 
-	TE_mean = TE_mean + TIMER_CounterGet(TIMER1);
+	TE = TIMER_CounterGet(TIMER1);
+	if (sync_cnt>2){
+		TE_dif_temp = TE - TE_std;
+
+		if (TE_dif_temp > 40 || TE_dif_temp < -40){
+			TE = TE_temp;
+		}
+	}
+
+	TE_mean = TE_mean + TE;
 	cnt++;
+	TE_temp = TE;
 
-	if (cnt == 64){
+	if (cnt == 32){
 		cnt = 0;
 		sync_cnt++;
-		TE_reg = TE_mean >> 6;
+		TE_reg = TE_mean >> 5;
 		TE_mean = 0;
 		if (sync_cnt<2)
 			TE_std = TE_reg;
 		else{
 			if (sync_cnt==2){
-				TE_std = pMainCtrlFrame->frameCtrl_blank[2] + (pMainCtrlFrame->adcIndex<<8);
+				TE_std = TE_reg;//pMainCtrlFrame->frameCtrl_blank[2] + (pMainCtrlFrame->adcIndex<<8);
 			}
-			else{
-				TE_dif_std_temp = TE_reg - TE_std - TE_dif_std;
-				if (TE_dif_std_temp > 12 || TE_dif_std_temp < -12)
-					TE_reg = TE_reg_temp;
-			}
-			TIMER_Enable(TIMER0, false);
-			TIMER_Enable(TIMER1, false);
-			if (TE_reg > TE_std){
-				TE_dif = TE_reg - TE_std;
+//			else{
+//				TE_dif_std_temp = TE_reg - TE_std - TE_dif_std;
+//				if (TE_dif_std_temp > 12 || TE_dif_std_temp < -12)
+//					TE_reg = TE_reg_temp;
+//			}
+//			TIMER_Enable(TIMER0, false);
+//			TIMER_Enable(TIMER1, false);
+			TE_dif = TE_reg - TE_std;
+			if (TE_dif > 0){
+				//TE_dif = TE_reg - TE_std;
 				t0 = TIMER_CounterGet(TIMER0);
 				t1 = TIMER_CounterGet(TIMER1);
 
@@ -162,9 +176,9 @@ void time_sync(struct MainCtrlFrame *pMainCtrlFrame){
 				}
 			}
 			else{
-				TE_dif = TE_std - TE_reg;
-				t0 = TIMER_CounterGet(TIMER0) + TE_dif;
-				t1 = TIMER_CounterGet(TIMER1) + TE_dif;
+				//TE_dif = TE_std - TE_reg;
+				t0 = TIMER_CounterGet(TIMER0) - TE_dif;
+				t1 = TIMER_CounterGet(TIMER1) - TE_dif;
 
 				if (t0 < US200_COUNT - 1){
 					TIMER_CounterSet(TIMER0, t0);
@@ -177,12 +191,14 @@ void time_sync(struct MainCtrlFrame *pMainCtrlFrame){
 					}
 				}
 			}
-			TIMER_Enable(TIMER0, true);
-			TIMER_Enable(TIMER1, true);
+//			TIMER_Enable(TIMER0, true);
+//			TIMER_Enable(TIMER1, true);
 		}
-		TE_dif_std = TE_reg - TE_std;
-		TE_reg_temp = TE_reg;
+//		TE_dif_std = TE_reg - TE_std;
+//		TE_reg_temp = TE_reg;
 	}
+
+	return TE_dif;
 }
 
 uint32_t time_get(uint8_t TOA_Low, uint8_t TOA_High){
@@ -307,7 +323,7 @@ void form_sample_set_token_frame(dwDevice_t *dev, struct MainCtrlFrame *pMainCtr
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
 	//pMainCtrlFrame->crc1 = (data_crc >> 8) & 0xff;
-	frm_cnt = frm_cnt_init;
+	frm_cnt = 0;
 
 	sendTokenFrame(dev, pMainCtrlFrame, RECV_TRUNON_TIME);
 }
@@ -316,13 +332,13 @@ void form_sample_data_token_frame(dwDevice_t *dev, struct MainCtrlFrame *pMainCt
 {
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint16_t data_crc;
-	//int16_t dif;
+	int32_t dif = 0;
 
 	//TE = time_get(pMainCtrlFrame->frameCtrl_blank[0], pMainCtrlFrame->frameCtrl_blank[1]);
 //	uint32_t TOA_R = g_Ticks * MS_COUNT + TIMER_CounterGet(TIMER1) - g_dataSend_time;
 //	uint32_t TOA_T = pMainCtrlFrame->frameCtrl_blank[0]+ (pMainCtrlFrame->frameCtrl_blank[1]<<8);
 //	TE = (TOA_T - TOA_R)>>1;
-//	TE = TIMER_CounterGet(TIMER1);
+
 	pMainCtrlFrame->frameType = ENUM_SAMPLE_DATA_TOKEN;
 	//adc_index = pMainCtrlFrame->adcIndex;
 	pSampleBuf = dequeueSample(&g_adcSampleDataQueue);
@@ -340,12 +356,12 @@ void form_sample_data_token_frame(dwDevice_t *dev, struct MainCtrlFrame *pMainCt
 	}
 	pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
 	//pMainCtrlFrame->adcIndex = slave_adc_index;
-	time_sync(pMainCtrlFrame);
+	dif = time_sync(pMainCtrlFrame);
 
-	pMainCtrlFrame->frameCtrl_blank[0] = TE_reg;
-	pMainCtrlFrame->frameCtrl_blank[1] = TE_reg>>8;
-	pMainCtrlFrame->frameCtrl_blank[2] = TE_std;
-	pMainCtrlFrame->adcIndex = TE_std>>8;
+	pMainCtrlFrame->frameCtrl_blank[0] = dif;
+	pMainCtrlFrame->frameCtrl_blank[1] = dif>>8;
+	pMainCtrlFrame->frameCtrl_blank[2] = dif>>16;//TE_std;
+	pMainCtrlFrame->adcIndex = dif>>24;//TE_std>>8;
 	pMainCtrlFrame->serial = frm_cnt;
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
@@ -362,6 +378,7 @@ void form_repeat_data_token_frame(dwDevice_t *dev, struct MainCtrlFrame *pMainCt
 	ADC_SAMPLE_BUFFERDef *pSampleBuf = NULL;
 	uint16_t data_crc;
 	uint32_t times;
+	int32_t dif = 0;
 	//uint32_t TE;
 
 	times = g_Ticks - g_dataRecv_time;
@@ -396,13 +413,13 @@ void form_repeat_data_token_frame(dwDevice_t *dev, struct MainCtrlFrame *pMainCt
 	}
 	pMainCtrlFrame->frameType |= (g_batteryVol & 0x0f) << 4;
 
-	//time_sync(pMainCtrlFrame);
+	dif = time_sync(pMainCtrlFrame);
 
-	pMainCtrlFrame->frameCtrl_blank[0] = TE_reg;
-	pMainCtrlFrame->frameCtrl_blank[1] = TE_reg>>8;
+	pMainCtrlFrame->frameCtrl_blank[0] = dif;
+	pMainCtrlFrame->frameCtrl_blank[1] = dif>>8;
 
-	pMainCtrlFrame->frameCtrl_blank[2] = TE_std;
-	pMainCtrlFrame->adcIndex = TE_std>>8;
+	pMainCtrlFrame->frameCtrl_blank[2] = dif>>16;
+	pMainCtrlFrame->adcIndex = dif>>24;
 	pMainCtrlFrame->serial = frm_cnt;
 	data_crc = CalFrameCRC(pMainCtrlFrame->data, FRAME_DATA_LEN);
 	pMainCtrlFrame->crc0 = data_crc & 0xff;
@@ -461,6 +478,7 @@ void Sync_Slave_Bat_Get(dwDevice_t *dev, struct MainCtrlFrame *pMainCtrlFrame)
 	dwNewReceive(dev);
 	dwStartReceive(dev);
 	sync_cnt=0;
+	frm_cnt = 0;
 }
 
 //int p_cnt=0;

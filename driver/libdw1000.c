@@ -1761,12 +1761,8 @@ void dwSendData(dwDevice_t *dev, uint8_t data[], uint32_t len, uint32_t resp_tim
 void dwRecvData(dwDevice_t *dev)
 {
 	//int len = sizeof(g_recvSlaveFr);
-	int len = 11;
-	//memset((void *)&g_dwMacFrameRecv, 0x00, sizeof(g_dwMacFrameRecv));
-//	len = dwGetDataLength(dev);
 	//TE = TIMER_CounterGet(TIMER1);
-//	dwGetData(dev, (uint8_t *)&g_dwMacFrameRecv, len);
-//	g_dataRecvDone = true;
+	int len = 11;
 	dwGetData(dev, (uint8_t *)&g_recvSlaveFr, len);
 
 	if ((((g_recvSlaveFr.frameCtrl & 0xff) == UWB_Default.subnode_id) || ((g_recvSlaveFr.frameCtrl & 0xff) == 0x00)) && (((g_recvSlaveFr.frameType & 0x0f) % 2)== 1)){
